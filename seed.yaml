@@ -1,0 +1,599 @@
+goal: iPhone 전용 SwiftUI 앱으로, 앱 안에서는 기본 예시 루틴 기반의 사전 루틴·목표 무게·목표 횟수·세트 간 휴식 시간을 설정하고, 잠금 화면 Live Activity에서는 목표 횟수 중심의 -/+ 실제 횟수 조정과 세트 완료 액션으로 휴식 타이머를 진행하며, 휴식 종료 3초 전 알림음/진동으로 다음 세트를 안내하고, 운동 종료 후 기기 로컬에 최종 기록을 저장하는 운동 루틴 MVP를 만든다.
+task_type: code
+brownfield_context:
+  project_type: greenfield
+  repository: https://github.com/HSUNEH/nextset
+  context_references:
+    - https://developer.apple.com/design/resources/
+  existing_patterns: []
+  existing_dependencies: []
+constraints:
+  - iPhone 전용 iOS 앱으로 만든다.
+  - MVP 타깃은 iOS 17 이상으로 고정한다.
+  - SwiftUI 기반 iOS 네이티브 앱으로 구현한다.
+  - 잠금 화면 기능은 ActivityKit / Live Activities 기반으로 구현한다.
+  - UI/UX는 Apple Developer Design Resources와 Human Interface Guidelines를 참고한다.
+  - 앱 내부 UI는 운동 중 한 손 조작을 기준으로 설계하며, 주요 숫자(목표 횟수, 실제 횟수, 휴식 남은 시간)는 34pt 이상, 주요 액션 버튼(세트 완료, -/+)은 최소 44x44pt 탭 영역을 제공한다.
+  - 운동 중 핵심 상태 화면은 스크롤 없이 운동명, 세트 번호, 목표/실제 횟수, 휴식 남은 시간, 주 액션을 동시에 표시해야 한다.
+  - 잠금 화면 Live Activity UI는 현재 운동명, 세트 번호, 목표 횟수, -/+ 실제 횟수 조정, 세트 완료, 휴식 남은 시간, 재개 예정 시간을 표시한다.
+  - WebView 기반 UI, React Native, Flutter, Electron 등 크로스플랫폼 UI 프레임워크는 MVP에서 제외한다.
+  - 핵심 기능 단위는 세트 입력 단, 세트 진행 단, 최종 기록 단으로 나눈다.
+  - 앱 안에서 사전 루틴 세팅, 목표 무게 설정, 목표 횟수 설정, 세트 간 휴식 시간 설정을 처리한다.
+  - MVP는 최소 3개의 기본 예시 루틴을 제공한다.
+  - 오늘 운동 중 사용자가 세트를 수동 추가할 수 있어야 하지만, 별도 커스텀 루틴 빌더/저장 편집기는 MVP에서 제외한다.
+  - 잠금 화면에서는 목표 횟수를 가운데 표시하고 -/+ 버튼으로 실제 수행 횟수만 조정한다.
+  - 잠금 화면에서 무게 수정, 세트 추가/삭제, 루틴 변경, 휴식 시간 변경은 제외한다.
+  - 세트 완료 버튼을 누르면 휴식 타이머가 자동 시작되어야 한다.
+  - 휴식 종료 3초 전부터 “3, 2, 1, 경적” 알림음과 진동으로 재개를 알려야 한다.
+  - 휴식 종료 cue 테스트의 목표 결과는 음악 앱 playback 상태가 playing으로 유지된 채 cue가 들리는 것이다.
+  - iOS 잠금 화면/백그라운드 정책상 이상적인 카운트다운 오디오가 불가능한 경우, 알림음 + 진동 fallback을 허용하되 이 제한과 fallback 동작을 명시적으로 문서화한다.
+  - 운동 기록은 MVP에서 SwiftData를 기본 로컬 저장소로 사용한다. SwiftData 사용이 불가능한 환경에서는 Codable 파일 저장 등 기기 내 로컬 persistence를 사용하되 sessionId로 WorkoutSummary를 저장·조회할 수 있어야 한다.
+  - 운동 종료 시 운동명, 세트별 무게/횟수, 총 세트 수, 총 볼륨, 운동 시작/종료 시간이 저장되어야 한다.
+  - Apple Watch 연동/전용 앱은 MVP에서 제외한다.
+  - HIG/Apple Design Resources 준수는 README 또는 design-notes 문서의 UI review checklist로 검증하며, 최소 항목은 native navigation, native typography, SF Symbols/system controls where appropriate, 44x44pt minimum tap target, Dynamic Type/accessibility labels이다.
+  - 운동 중 주 액션(세트 완료, -/+)은 활성 운동 화면 하단 또는 엄지 도달 영역에 배치한다.
+acceptance_criteria:
+  - 앱은 iOS 17 이상 iPhone 타깃의 SwiftUI 프로젝트로 빌드되며 WebView/React Native/Flutter/Electron 기반 UI 의존성이 없다.
+  - 사용자는 앱 안에서 최소 3개의 기본 예시 루틴 중 하나를 시작할 수 있다.
+  - 사용자는 앱 안에서 오늘 운동의 목표 무게, 목표 횟수, 세트 간 휴식 시간을 확인하고 수정할 수 있다.
+  - 사용자는 앱 안에서 오늘 운동에 세트를 수동 추가할 수 있지만, 추가한 세트가 별도 커스텀 루틴 템플릿으로 저장되지는 않는다.
+  - 각 세트 화면은 운동명, 세트 번호, 목표 무게, 목표 횟수, 실제 횟수 입력/조정, 세트 완료 버튼을 표시한다.
+  - Live Activity는 잠금 화면에서 현재 운동명, 세트 번호, 목표 횟수, 실제 횟수, -/+ 조정 액션, 세트 완료 액션, 휴식 남은 시간, 재개 예정 시간을 표시한다.
+  - 사용자가 앱 또는 Live Activity에서 세트 완료를 누르면 actualReps, actualWeight, completedAt이 CompletedSet에 기록되고 휴식 타이머가 자동 시작된다.
+  - actualWeight는 앱 내부 세트 화면에서 수정하지 않으면 targetWeight를 기본값으로 복사해 기록한다.
+  - 휴식 중 앱과 Live Activity는 restRemainingSeconds와 resumeAt을 표시하며 다음 세트로 진행 가능한 상태를 유지한다.
+  - 휴식 종료 3초 전부터 3, 2, 1, 경적 순서의 재개 cue가 알림음/진동으로 발생한다.
+  - 음악 재생 중 휴식 종료 cue를 테스트했을 때 음악 playback이 중단되지 않거나, iOS 정책상 불가능한 경우 fallbackMode=notificationSoundAndHaptics가 동작한다.
+  - README에는 “Rest cue and iOS audio behavior” 섹션이 있고, 음악 재생 중 cue 테스트 절차, 관찰 결과, fallback 조건이 기록되어 있다.
+  - 잠금 화면에서는 실제 횟수 조정과 세트 완료만 가능하며 무게 수정, 세트 추가/삭제, 루틴 변경, 휴식 시간 변경은 제공되지 않는다.
+  - 마지막 세트 이후 사용자는 운동을 종료할 수 있고, 기기 로컬 저장소에 운동명, 세트별 실제 무게/횟수, 총 세트 수, 총 볼륨, 시작/종료 시간이 포함된 workoutSummary가 저장된다.
+  - 저장된 workoutSummary를 앱 안 최종 기록 화면에서 다시 확인할 수 있다.
+  - 도메인 숫자값은 유효 범위를 지킨다: reps와 set index는 정수, weight와 totalVolume은 0 이상, restDurationSeconds와 restRemainingSeconds는 0 이상의 초 단위 정수다.
+  - 핵심 운동 상태 화면과 Live Activity는 스크롤 없이 현재 운동명, 세트 번호, 목표/실제 횟수, 휴식 남은 시간 또는 세트 완료 주 액션을 동시에 표시한다.
+  - LockScreenState.resumeAt은 phase가 resting 또는 readyForNextSet일 때 non-null이고, performingSet 또는 completed일 때만 null일 수 있다.
+  - LockScreenActionPolicy는 canEditWeight, canAddSet, canDeleteSet, canChangeRoutine, canChangeRestDuration을 모두 false로 유지한다.
+  - WorkoutSummary.totalSets는 completedSets.length와 같고, WorkoutSummary.totalVolume은 completedSets의 actualWeight * actualReps 합계와 같다.
+  - README 또는 design-notes 문서에는 Apple HIG/UI review checklist와 Rest cue and iOS audio behavior 섹션이 존재한다.
+ontology_schema:
+  name: WorkoutRoutineSession
+  description: iPhone 운동 루틴 MVP에서 기본 루틴 카탈로그, 오늘 운동 세션, 세트 목표, 실제 수행값, 휴식 타이머, Live Activity 상태, 재개 cue, 최종 기록을 표현하는 도메인 모델
+  entities:
+    - name: RoutineCatalog
+      description: MVP에 포함된 기본 예시 루틴 목록
+      fields:
+        - name: routines
+          type: array<RoutineTemplate>
+          required: true
+          minItems: 3
+          description: 최소 3개의 기본 예시 루틴
+    - name: RoutineTemplate
+      description: 사용자가 오늘 운동으로 시작할 수 있는 기본 루틴 템플릿
+      fields:
+        - name: routineId
+          type: string
+          required: true
+          description: 루틴 식별자
+        - name: routineName
+          type: string
+          required: true
+          description: 루틴 이름
+        - name: plannedSets
+          type: array<PlannedSet>
+          required: true
+          description: 루틴에 포함된 목표 세트 목록
+    - name: PlannedSet
+      description: 운동 전에 앱 안에서 확인/수정하는 목표 세트
+      fields:
+        - name: setId
+          type: string
+          required: true
+          description: 세트 식별자
+        - name: exerciseName
+          type: string
+          required: true
+          description: 운동 종목 이름
+        - name: targetWeight
+          type: number
+          required: true
+          constraints: ">= 0"
+          description: 목표 무게
+        - name: targetReps
+          type: integer
+          required: true
+          constraints: ">= 0"
+          description: 목표 횟수
+        - name: restDurationSeconds
+          type: integer
+          required: true
+          constraints: ">= 0"
+          description: 세트 완료 후 휴식 시간(초)
+        - name: manuallyAdded
+          type: boolean
+          required: true
+          description: 오늘 운동 중 수동 추가된 세트인지 여부
+    - name: CompletedSet
+      description: 수행 후 확정된 실제 세트 기록
+      fields:
+        - name: setId
+          type: string
+          required: true
+          description: 대응되는 목표 세트 식별자
+        - name: exerciseName
+          type: string
+          required: true
+          description: 운동 종목 이름
+        - name: actualWeight
+          type: number
+          required: true
+          constraints: ">= 0"
+          description: 실제 수행 무게
+        - name: actualReps
+          type: integer
+          required: true
+          constraints: ">= 0"
+          description: 실제 수행 횟수
+        - name: completedAt
+          type: string
+          required: true
+          description: 세트 완료 시각 ISO-8601 문자열
+    - name: LockScreenState
+      description: Live Activity / 잠금 화면에 표시되고 조작되는 현재 운동 상태
+      fields:
+        - name: exerciseName
+          type: string
+          required: true
+          description: 현재 운동 종목
+        - name: currentSetIndex
+          type: integer
+          required: true
+          constraints: ">= 1"
+          description: 현재 세트 순서
+        - name: totalPlannedSets
+          type: integer
+          required: true
+          constraints: ">= 1"
+          description: 오늘 운동의 예정 세트 수
+        - name: targetReps
+          type: integer
+          required: true
+          constraints: ">= 0"
+          description: 가운데 표시되는 목표 횟수
+        - name: actualReps
+          type: integer
+          required: true
+          constraints: ">= 0"
+          description: -/+로 조정되는 실제 횟수
+        - name: canDecrementReps
+          type: boolean
+          required: true
+          description: "- 버튼 활성 여부"
+        - name: canIncrementReps
+          type: boolean
+          required: true
+          description: "+ 버튼 활성 여부"
+        - name: canCompleteSet
+          type: boolean
+          required: true
+          description: 세트 완료 액션 활성 여부
+        - name: restRemainingSeconds
+          type: integer
+          required: true
+          constraints: ">= 0"
+          description: 휴식 남은 시간(초)
+        - name: resumeAt
+          type: string
+          required: false
+          nullable: true
+          phaseRule: "required and non-null when phase is resting or readyForNextSet; nullable only when phase is performingSet or completed"
+          description: 다음 세트 재개 예정 시각 ISO-8601 문자열
+        - name: phase
+          type: enum
+          required: true
+          values: [performingSet, resting, readyForNextSet, completed]
+          description: 잠금 화면 표시 상태
+    - name: RestCountdownCue
+      description: 휴식 종료 3초 전 재개 안내 cue
+      fields:
+        - name: notificationLeadTimeSeconds
+          type: integer
+          required: true
+          constraints: "== 3"
+          description: 재개 예정 시각 전 cue 시작 시간, MVP에서는 3
+        - name: spokenCountdown
+          type: array<string>
+          required: true
+          constraints: "exactly [\"3\", \"2\", \"1\"]"
+          description: ["3", "2", "1"]
+        - name: hornCueEnabled
+          type: boolean
+          required: true
+          ordering: "after spokenCountdown completes"
+          description: 카운트다운 후 경적 cue 사용 여부
+        - name: vibrationCueEnabled
+          type: boolean
+          required: true
+          ordering: "during countdown and/or horn cue"
+          description: 진동 cue 사용 여부
+        - name: shouldNotInterruptMusic
+          type: boolean
+          required: true
+          description: 음악 재생 중단 없이 cue를 재생하는 목표
+        - name: fallbackMode
+          type: enum
+          required: true
+          values: [none, notificationSoundAndHaptics]
+          description: iOS 정책상 이상적 오디오가 불가능할 때 사용하는 fallback
+    - name: WorkoutRoutineSession
+      description: 진행 중이거나 완료된 오늘 운동 세션
+      fields:
+        - name: sessionId
+          type: string
+          required: true
+          description: 운동 세션 식별자
+        - name: routineId
+          type: string
+          required: true
+          description: 시작한 기본 예시 루틴의 식별자
+        - name: routineName
+          type: string
+          required: true
+          description: 운동 루틴 이름
+        - name: plannedSets
+          type: array<PlannedSet>
+          required: true
+          description: 오늘 운동의 목표 세트 목록
+        - name: completedSets
+          type: array<CompletedSet>
+          required: true
+          description: 완료된 실제 수행 세트 목록
+        - name: currentSetIndex
+          type: integer
+          required: true
+          constraints: ">= 1"
+          description: 현재 진행 중인 세트 순서
+        - name: sessionStatus
+          type: enum
+          required: true
+          values: [notStarted, active, resting, completed, cancelled]
+          description: 운동 세션 생명주기 상태
+        - name: workoutStartTime
+          type: string
+          required: true
+          description: 운동 시작 시각 ISO-8601 문자열
+        - name: workoutEndTime
+          type: string
+          required: false
+          nullable: true
+          description: 운동 종료 전에는 null이고 종료 후 저장되는 ISO-8601 문자열
+        - name: lockScreenState
+          type: LockScreenState
+          required: true
+          description: 현재 Live Activity 상태
+        - name: restCountdownCue
+          type: RestCountdownCue
+          required: true
+          description: 휴식 종료 안내 cue 설정/상태
+    - name: WorkoutSummary
+      description: 운동 종료 후 기기 로컬 저장소에 저장되는 최종 기록
+      fields:
+        - name: sessionId
+          type: string
+          required: true
+          description: 원본 운동 세션 식별자
+        - name: routineName
+          type: string
+          required: true
+          description: 완료한 루틴 이름
+        - name: completedSets
+          type: array<CompletedSet>
+          required: true
+          description: 세트별 실제 수행 기록
+        - name: totalSets
+          type: integer
+          required: true
+          constraints: ">= 0; equals completedSets.length"
+          description: 완료된 총 세트 수
+        - name: totalVolume
+          type: number
+          required: true
+          constraints: ">= 0; equals sum(completedSets.actualWeight * completedSets.actualReps)"
+          description: 세트별 actualWeight * actualReps 합계
+        - name: workoutStartTime
+          type: string
+          required: true
+          description: 운동 시작 시각
+        - name: workoutEndTime
+          type: string
+          required: true
+          description: 운동 종료 시각
+
+    - name: LocalWorkoutStore
+      description: MVP의 기기 로컬 운동 기록 저장소
+      fields:
+        - name: storageTechnology
+          type: enum
+          required: true
+          values: [SwiftData, equivalentLocalPersistence]
+          description: 운동 요약 저장에 쓰는 iOS 로컬 persistence 방식
+        - name: savedSummaries
+          type: array<WorkoutSummary>
+          required: true
+          description: 저장된 운동 요약 기록 목록
+        - name: canRetrieveSummaryBySessionId
+          type: boolean
+          required: true
+          description: sessionId로 저장된 WorkoutSummary를 다시 불러올 수 있는지 여부
+    - name: FinalRecordView
+      description: 운동 종료 후 앱 안에서 보여주는 최종 기록 화면
+      fields:
+        - name: displayedSummary
+          type: WorkoutSummary
+          required: true
+          description: 화면에 표시되는 저장된 운동 요약
+        - name: showsExerciseSetRows
+          type: boolean
+          required: true
+          description: 세트별 실제 무게/횟수 행 표시 여부
+        - name: showsTotalSets
+          type: boolean
+          required: true
+          description: 총 세트 수 표시 여부
+        - name: showsTotalVolume
+          type: boolean
+          required: true
+          description: 총 볼륨 표시 여부
+        - name: showsStartAndEndTime
+          type: boolean
+          required: true
+          description: 시작/종료 시간 표시 여부
+
+    - name: AppTargetConfig
+      description: NextSet MVP 앱 타깃과 네이티브 구현 정책
+      fields:
+        - name: platform
+          type: enum
+          required: true
+          values: [iPhone]
+          description: 1차 타깃 플랫폼
+        - name: minimumIOSVersion
+          type: string
+          required: true
+          constraints: ">= iOS 17"
+          description: 최소 지원 iOS 버전
+        - name: uiFramework
+          type: enum
+          required: true
+          values: [SwiftUI]
+          description: 앱 UI 구현 프레임워크
+        - name: lockScreenTechnology
+          type: enum
+          required: true
+          values: [ActivityKitLiveActivities]
+          description: 잠금 화면 구현 기술
+    - name: DependencyPolicy
+      description: MVP에서 허용/금지하는 UI 기술 의존성
+      fields:
+        - name: usesWebViewUI
+          type: boolean
+          required: true
+          constraints: "false"
+          description: WebView 기반 UI 사용 여부
+        - name: usesReactNative
+          type: boolean
+          required: true
+          constraints: "false"
+          description: React Native 사용 여부
+        - name: usesFlutter
+          type: boolean
+          required: true
+          constraints: "false"
+          description: Flutter 사용 여부
+        - name: usesElectron
+          type: boolean
+          required: true
+          constraints: "false"
+          description: Electron 사용 여부
+    - name: WorkoutSetScreen
+      description: 앱 내부의 세트 수행 화면
+      fields:
+        - name: showsExerciseName
+          type: boolean
+          required: true
+          description: 운동명 표시 여부
+        - name: showsSetIndex
+          type: boolean
+          required: true
+          description: 세트 번호 표시 여부
+        - name: showsTargetWeight
+          type: boolean
+          required: true
+          description: 목표 무게 표시 여부
+        - name: showsTargetReps
+          type: boolean
+          required: true
+          description: 목표 횟수 표시 여부
+        - name: allowsActualRepsAdjustment
+          type: boolean
+          required: true
+          description: 실제 횟수 조정 가능 여부
+        - name: allowsActualWeightEdit
+          type: boolean
+          required: true
+          description: 실제 무게 수정 가능 여부
+        - name: setCompleteButtonTapTargetPt
+          type: integer
+          required: true
+          constraints: ">= 44"
+          description: 세트 완료 버튼 최소 탭 영역 포인트
+    - name: CoreWorkoutStateView
+      description: 운동 중 현재 상태를 1화면에서 보여주는 핵심 상태 UI
+      fields:
+        - name: showsWithoutScroll
+          type: boolean
+          required: true
+          constraints: "true"
+          description: 핵심 정보가 스크롤 없이 동시에 표시되는지 여부
+        - name: primaryNumberFontSizePt
+          type: integer
+          required: true
+          constraints: ">= 34"
+          description: 목표/실제 횟수 및 휴식 시간 표시 폰트 크기
+        - name: primaryActionsInThumbReachArea
+          type: boolean
+          required: true
+          constraints: "true"
+          description: 주 액션 버튼이 엄지 도달 영역에 있는지 여부
+    - name: LockScreenActionPolicy
+      description: 잠금 화면에서 허용/금지되는 조작 정책
+      fields:
+        - name: canAdjustActualReps
+          type: boolean
+          required: true
+          constraints: "true"
+          description: 실제 횟수 조정 허용 여부
+        - name: canCompleteSet
+          type: boolean
+          required: true
+          constraints: "true"
+          description: 세트 완료 허용 여부
+        - name: canEditWeight
+          type: boolean
+          required: true
+          constraints: "false"
+          description: 무게 수정 허용 여부
+        - name: canAddSet
+          type: boolean
+          required: true
+          constraints: "false"
+          description: 세트 추가 허용 여부
+        - name: canDeleteSet
+          type: boolean
+          required: true
+          constraints: "false"
+          description: 세트 삭제 허용 여부
+        - name: canChangeRoutine
+          type: boolean
+          required: true
+          constraints: "false"
+          description: 루틴 변경 허용 여부
+        - name: canChangeRestDuration
+          type: boolean
+          required: true
+          constraints: "false"
+          description: 휴식 시간 변경 허용 여부
+    - name: RestCueTestResult
+      description: 음악 재생 중 휴식 종료 cue 동작 검증 결과
+      fields:
+        - name: cueSequenceState
+          type: enum
+          required: true
+          values: [notStarted, countdown3, countdown2, countdown1, horn, fallbackNotification, completed]
+          description: cue 재생 상태
+        - name: playbackStateBeforeCue
+          type: enum
+          required: true
+          values: [playing, paused, unknown]
+          description: cue 전 음악 playback 상태
+        - name: playbackStateAfterCue
+          type: enum
+          required: true
+          values: [playing, paused, interrupted, unknown]
+          description: cue 후 음악 playback 상태
+        - name: fallbackReason
+          type: string
+          required: false
+          nullable: true
+          description: fallback을 선택한 iOS 정책/기술 제한 사유
+        - name: fallbackModeSelectionRule
+          type: string
+          required: true
+          description: ideal cue가 음악 playback을 유지하지 못하거나 iOS 정책상 불가할 때 notificationSoundAndHaptics를 선택한다
+    - name: ReadmeAudioBehaviorSection
+      description: README의 휴식 cue 및 iOS 오디오 동작 문서 섹션
+      fields:
+        - name: sectionTitle
+          type: string
+          required: true
+          constraints: "Rest cue and iOS audio behavior"
+          description: 필수 섹션 제목
+        - name: includesMusicPlaybackTestSteps
+          type: boolean
+          required: true
+          constraints: "true"
+          description: 음악 재생 중 cue 테스트 절차 포함 여부
+        - name: includesObservedResults
+          type: boolean
+          required: true
+          constraints: "true"
+          description: 관찰 결과 포함 여부
+        - name: includesFallbackConditions
+          type: boolean
+          required: true
+          constraints: "true"
+          description: fallback 조건 포함 여부
+    - name: DesignReviewChecklist
+      description: Apple HIG/Design Resources 기반 UI 검토 체크리스트
+      fields:
+        - name: nativeNavigationChecked
+          type: boolean
+          required: true
+          description: 네이티브 내비게이션 사용 검토 여부
+        - name: nativeTypographyChecked
+          type: boolean
+          required: true
+          description: iOS 네이티브 타이포그래피 검토 여부
+        - name: minimumTapTargetChecked
+          type: boolean
+          required: true
+          description: 44x44pt 이상 탭 영역 검토 여부
+        - name: accessibilityLabelsChecked
+          type: boolean
+          required: true
+          description: 접근성 라벨 검토 여부
+        - name: dynamicTypeConsidered
+          type: boolean
+          required: true
+          description: Dynamic Type 고려 여부
+evaluation_principles:
+  - name: GymUsability
+    description: 헬스장 운동 중 빠르게 보고 조작할 수 있어야 하며 앱을 반복적으로 여는 부담을 줄여야 한다.
+    weight: 0.25
+  - name: LockScreenCoreValue
+    description: Live Activity에서 루틴 진행 상태 확인, 횟수 조정, 세트 완료, 휴식 확인이 실제로 가능해야 한다.
+    weight: 0.25
+  - name: WorkoutFlowCompleteness
+    description: 기본 루틴 시작부터 세트 수행, 휴식, 다음 세트, 최종 기록 저장까지 한 번의 운동 흐름이 끊김 없이 완료되어야 한다.
+    weight: 0.2
+  - name: NativeAppleQuality
+    description: SwiftUI, ActivityKit, Apple Design Resources/HIG에 맞는 iOS 네이티브 UI/UX를 제공해야 한다.
+    weight: 0.15
+  - name: DataAccuracy
+    description: 세트별 실제 수행값, 총 세트 수, 총 볼륨, 시작/종료 시간이 정확히 기록되어야 한다.
+    weight: 0.1
+  - name: NotificationExperience
+    description: 휴식 종료 cue와 진동이 제때 동작하고 운동 중 음악 경험을 방해하지 않는 것을 목표로 하며, iOS 제한 시 fallback이 문서화되어야 한다.
+    weight: 0.05
+exit_conditions:
+  - name: MVPFlowComplete
+    description: 기본 루틴 하나를 시작해 모든 세트를 완료하고 최종 운동 요약 기록이 저장된다.
+    criteria: WorkoutSummary에 운동명, 세트별 실제 무게/횟수, 총 세트 수, 총 볼륨, 시작/종료 시간이 저장되고 최종 기록 화면에서 확인된다.
+  - name: LockScreenWorkoutUsable
+    description: 운동 중 Live Activity에서 핵심 진행 조작이 가능하다.
+    criteria: 잠금 화면에서 목표 횟수 표시, -/+ 실제 횟수 조정, 세트 완료, 휴식 남은 시간, 재개 예정 시간이 동작한다.
+  - name: RestNotificationVerified
+    description: 휴식 종료 안내가 사용자를 다음 세트로 복귀시킨다.
+    criteria: 휴식 종료 3초 전 카운트다운/경적 cue와 진동이 발생하며, 음악이 중단되지 않거나 iOS 제한으로 인한 fallback이 동작하고 문서화된다.
+  - name: ScopeGuardSatisfied
+    description: MVP 제외 범위를 구현하지 않고 핵심 범위에 집중한다.
+    criteria: Apple Watch 앱, 커스텀 루틴 빌더, 잠금 화면 무게 수정/세트 추가/루틴 변경/휴식 변경, 크로스플랫폼 UI 프레임워크가 포함되지 않는다.
+metadata:
+  seed_id: seed_739c06adc362
+  version: 1.4.0
+  created_at: '2026-07-02T12:03:42.031170Z'
+  revised_at: '2026-07-02T12:45:00Z'
+  ambiguity_score: 0.141
+  interview_id: interview_20260629_092258
+  repository: https://github.com/HSUNEH/nextset
+  generation_mode: revised_after_qa
+  degraded: false
+  unresolved_slots: []
