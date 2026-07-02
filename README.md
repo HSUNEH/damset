@@ -67,6 +67,7 @@ This repo now contains a testable Swift core plus iOS app/Live Activity source s
 - `NextSetApp/` — SwiftUI iPhone app shell for routine selection and active workout flow.
 - `NextSetLiveActivity/` — ActivityKit/App Intents widget scaffold for Lock Screen `- / +` and set completion actions.
 - `docs/design-notes.md` — Apple HIG checklist plus Rest cue and iOS audio behavior test policy.
+- `docs/qa-automation.md` — layered QA plan for core tests, Xcode builds, simulator checks, real iPhone install, iPhone Mirroring/QuickTime screen-observed QA, and Lock Screen/Live Activity validation.
 
 ### Local verification
 
