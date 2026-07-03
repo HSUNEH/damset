@@ -46,4 +46,43 @@ if case .fallbackNotificationAndHaptics(let reason) = cue {
     expect(false, "interrupted playback should choose fallback")
 }
 
+// Set 2 of 4: actual-weight override and mid-rest countdown.
+try engine.completeCurrentSet(session: &session, actualWeight: 62.5, now: Date(timeIntervalSince1970: 20))
+expect(session.completedSets.last?.actualWeight == 62.5, "actual weight override is recorded")
+expect(session.sessionStatus == .resting, "non-final set starts rest")
+
+if let resumeAt = session.lockScreenState.resumeAt {
+    engine.updateRest(session: &session, now: resumeAt.addingTimeInterval(-5))
+    expect(session.lockScreenState.restRemainingSeconds == 5, "countdown reflects remaining rest")
+    expect(session.lockScreenState.phase == .resting, "still resting mid-countdown")
+    engine.updateRest(session: &session, now: resumeAt)
+}
+try engine.advanceToNextSet(session: &session)
+
+// Finish the remaining sets and verify the summary invariants.
+try engine.completeCurrentSet(session: &session, now: Date(timeIntervalSince1970: 30))
+try engine.advanceToNextSet(session: &session)
+try engine.completeCurrentSet(session: &session, now: Date(timeIntervalSince1970: 40))
+expect(session.sessionStatus == .completed, "final set completes the session")
+expect(session.workoutEndTime == Date(timeIntervalSince1970: 40), "completion stamps workoutEndTime")
+expect(session.lockScreenState.phase == .completed, "lock screen reaches completed phase")
+
+let summary = engine.summarize(session: session, endedAt: Date(timeIntervalSince1970: 40))
+expect(summary.totalSets == session.completedSets.count, "totalSets equals completed count")
+let expectedVolume = session.completedSets.reduce(0.0) { $0 + $1.actualWeight * Double($1.actualReps) }
+expect(summary.totalVolume == expectedVolume, "totalVolume equals weight*reps sum")
+
+// File store round-trip: a fresh instance on the same file must return the saved record.
+let storeURL = FileManager.default.temporaryDirectory
+    .appendingPathComponent("nextset-smoke-\(UUID().uuidString).json")
+let store = FileWorkoutStore(fileURL: storeURL)
+try store.save(summary)
+let reloaded = FileWorkoutStore(fileURL: storeURL)
+let roundTripped = try reloaded.summary(sessionId: summary.sessionId)
+expect(roundTripped == summary, "summary round-trips by sessionId")
+try store.save(summary)
+let listed = try reloaded.allSummaries()
+expect(listed.count == 1, "saving the same sessionId upserts instead of duplicating")
+try? FileManager.default.removeItem(at: storeURL)
+
 print("NextSetCoreSmoke ok")

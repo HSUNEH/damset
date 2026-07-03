@@ -62,9 +62,9 @@ Use Apple’s official design resources and Human Interface Guidelines:
 This repo now contains a testable Swift core plus iOS app/Live Activity source scaffolding:
 
 - `Package.swift` — SwiftPM package for `NextSetCore` and core tests.
-- `Sources/NextSetCore/` — routine catalog, planned/completed sets, workout session state, lock-screen state, rest cue policy, summary calculation, and local-store protocol.
-- `Sources/NextSetCoreSmoke/` — executable smoke verification for default routines, reps adjustment, set completion, rest transitions, manual session-scoped sets, and audio fallback policy. `XcodeTests/NextSetCoreTests/` keeps XCTest coverage for full Xcode environments.
-- `NextSetApp/` — SwiftUI iPhone app shell for routine selection and active workout flow.
+- `Sources/NextSetCore/` — routine catalog, planned/completed sets, workout session state, lock-screen state, rest cue policy, summary calculation, and local-store protocol with in-memory and JSON-file (`FileWorkoutStore`) implementations. Set completion accepts an optional actual-weight override (defaults to the planned target weight).
+- `Sources/NextSetCoreSmoke/` — executable smoke verification for default routines, reps adjustment, set completion, rest transitions, manual session-scoped sets, audio fallback policy, actual-weight override, full-session summary invariants, and file-store round-trip. `XcodeTests/NextSetCoreTests/` keeps XCTest coverage for full Xcode environments.
+- `NextSetApp/` — SwiftUI iPhone app for routine selection and active workout flow: 1 Hz rest countdown tick, actual-weight editing during a set, session-scoped set repeat, end-workout confirmation (full-screen cover so the session can't be swiped away), workout summaries persisted via `FileWorkoutStore`, and a History section with a per-set final record screen.
 - `NextSetLiveActivity/` — ActivityKit/App Intents widget scaffold for Lock Screen `- / +` and set completion actions.
 - `docs/design-notes.md` — Apple HIG checklist plus Rest cue and iOS audio behavior test policy.
 - `NextSet.xcodeproj` / `project.yml` — Xcode project generated with XcodeGen for iOS app, core framework, and Live Activity extension targets.
@@ -76,6 +76,7 @@ This repo now contains a testable Swift core plus iOS app/Live Activity source s
 The current machine has Apple Command Line Tools but not full Xcode selected, and this CLT install cannot import XCTest, so `xcodebuild` and `swift test` are blocked locally. The verified local gate is:
 
 ```bash
+swift build   # compiles NextSetCore, the SwiftUI app shell, and the Live Activity sources for the host platform
 swift run NextSetCoreSmoke
 ruby -e 'require "yaml"; YAML.load_file("seed.yaml"); puts "seed yaml ok"'
 git diff --check

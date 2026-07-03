@@ -102,6 +102,49 @@ final class WorkoutEngineTests: XCTestCase {
         XCTAssertFalse(catalog.routines.flatMap(\.plannedSets).contains { $0.manuallyAdded })
     }
 
+    func testCompleteSetRecordsActualWeightOverride() throws {
+        let routine = try XCTUnwrap(RoutineCatalog.defaultRoutines.first)
+        let engine = WorkoutEngine()
+        var session = try engine.startSession(routine: routine)
+
+        try engine.completeCurrentSet(session: &session, actualWeight: 62.5, now: Date(timeIntervalSince1970: 10))
+
+        XCTAssertEqual(session.completedSets.last?.actualWeight, 62.5)
+    }
+
+    func testUpdateRestCountsDownMidRest() throws {
+        let routine = try XCTUnwrap(RoutineCatalog.defaultRoutines.first)
+        let engine = WorkoutEngine()
+        var session = try engine.startSession(routine: routine)
+        try engine.completeCurrentSet(session: &session, now: Date(timeIntervalSince1970: 100))
+        let resumeAt = try XCTUnwrap(session.lockScreenState.resumeAt)
+
+        engine.updateRest(session: &session, now: resumeAt.addingTimeInterval(-5))
+
+        XCTAssertEqual(session.lockScreenState.restRemainingSeconds, 5)
+        XCTAssertEqual(session.lockScreenState.phase, .resting)
+    }
+
+    func testFileStoreRoundTripsAndUpsertsBySessionId() throws {
+        let routine = try XCTUnwrap(RoutineCatalog.defaultRoutines.first)
+        let engine = WorkoutEngine()
+        var session = try engine.startSession(routine: routine, now: Date(timeIntervalSince1970: 0), sessionId: "file-store")
+        try engine.completeCurrentSet(session: &session, now: Date(timeIntervalSince1970: 10))
+        let summary = engine.summarize(session: session, endedAt: Date(timeIntervalSince1970: 20))
+
+        let fileURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("nextset-tests-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: fileURL) }
+
+        let store = FileWorkoutStore(fileURL: fileURL)
+        try store.save(summary)
+        try store.save(summary)
+
+        let reloaded = FileWorkoutStore(fileURL: fileURL)
+        XCTAssertEqual(try reloaded.summary(sessionId: "file-store"), summary)
+        XCTAssertEqual(try reloaded.allSummaries().count, 1)
+    }
+
     func testRestCueDecisionRequiresPlayingBeforeAndAfter() {
         let engine = WorkoutEngine()
         XCTAssertEqual(engine.decideRestCue(playbackWasPlaying: true, playbackStillPlayingAfterCue: true, iOSPolicyAllowsIdealCue: true), .idealAudioAllowed)

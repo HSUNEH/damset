@@ -50,14 +50,16 @@ public struct WorkoutEngine: Sendable {
         session.lockScreenState.canIncrementReps = true
     }
 
-    public func completeCurrentSet(session: inout WorkoutRoutineSession, now: Date = Date()) throws {
+    /// Completes the current set. `actualWeight` overrides the recorded weight when the user
+    /// edited it in the app; when nil, the planned target weight is recorded per spec.
+    public func completeCurrentSet(session: inout WorkoutRoutineSession, actualWeight: Double? = nil, now: Date = Date()) throws {
         guard session.sessionStatus != .completed else { throw WorkoutEngineError.sessionAlreadyCompleted }
         guard let planned = session.currentPlannedSet else { throw WorkoutEngineError.noActiveSet }
 
         let completed = CompletedSet(
             setId: planned.setId,
             exerciseName: planned.exerciseName,
-            actualWeight: planned.targetWeight,
+            actualWeight: actualWeight ?? planned.targetWeight,
             actualReps: session.lockScreenState.actualReps,
             completedAt: now
         )
