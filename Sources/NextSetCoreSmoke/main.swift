@@ -85,4 +85,25 @@ let listed = try reloaded.allSummaries()
 expect(listed.count == 1, "saving the same sessionId upserts instead of duplicating")
 try? FileManager.default.removeItem(at: storeURL)
 
+// Engine refresh: once rest fully elapses, the session auto-advances so a
+// lock-screen action applies to the set the user is about to perform.
+var refreshSession = try engine.startSession(routine: routine, now: Date(timeIntervalSince1970: 0), sessionId: "refresh")
+try engine.completeCurrentSet(session: &refreshSession, now: Date(timeIntervalSince1970: 5))
+if let resumeAt = refreshSession.lockScreenState.resumeAt {
+    engine.refresh(session: &refreshSession, now: resumeAt)
+}
+expect(refreshSession.currentSetIndex == 2, "refresh advances past an elapsed rest")
+expect(refreshSession.lockScreenState.phase == .performingSet, "refresh lands on performing the next set")
+
+// Active session store round-trip used for app <-> Live Activity intent sharing.
+let sessionURL = FileManager.default.temporaryDirectory
+    .appendingPathComponent("nextset-smoke-session-\(UUID().uuidString).json")
+let sessionStore = ActiveSessionStore(fileURL: sessionURL)
+try sessionStore.save(refreshSession)
+let loadedSession = try ActiveSessionStore(fileURL: sessionURL).load()
+expect(loadedSession == refreshSession, "active session round-trips through the shared store")
+try sessionStore.clear()
+let clearedSession = try ActiveSessionStore(fileURL: sessionURL).load()
+expect(clearedSession == nil, "clear removes the shared session")
+
 print("NextSetCoreSmoke ok")

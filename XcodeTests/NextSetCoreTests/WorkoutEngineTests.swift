@@ -145,6 +145,38 @@ final class WorkoutEngineTests: XCTestCase {
         XCTAssertEqual(try reloaded.allSummaries().count, 1)
     }
 
+    func testRefreshAdvancesPastElapsedRest() throws {
+        let routine = try XCTUnwrap(RoutineCatalog.defaultRoutines.first)
+        let engine = WorkoutEngine()
+        var session = try engine.startSession(routine: routine, now: Date(timeIntervalSince1970: 0))
+        try engine.completeCurrentSet(session: &session, now: Date(timeIntervalSince1970: 5))
+        let resumeAt = try XCTUnwrap(session.lockScreenState.resumeAt)
+
+        engine.refresh(session: &session, now: resumeAt)
+
+        XCTAssertEqual(session.currentSetIndex, 2)
+        XCTAssertEqual(session.lockScreenState.phase, .performingSet)
+        XCTAssertEqual(session.sessionStatus, .active)
+    }
+
+    func testActiveSessionStoreRoundTripsAndClears() throws {
+        let routine = try XCTUnwrap(RoutineCatalog.defaultRoutines.first)
+        let engine = WorkoutEngine()
+        var session = try engine.startSession(routine: routine, now: Date(timeIntervalSince1970: 0), sessionId: "shared")
+        try engine.completeCurrentSet(session: &session, now: Date(timeIntervalSince1970: 5))
+
+        let fileURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("nextset-tests-session-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: fileURL) }
+
+        let store = ActiveSessionStore(fileURL: fileURL)
+        try store.save(session)
+        XCTAssertEqual(try ActiveSessionStore(fileURL: fileURL).load(), session)
+
+        try store.clear()
+        XCTAssertNil(try ActiveSessionStore(fileURL: fileURL).load())
+    }
+
     func testRestCueDecisionRequiresPlayingBeforeAndAfter() {
         let engine = WorkoutEngine()
         XCTAssertEqual(engine.decideRestCue(playbackWasPlaying: true, playbackStillPlayingAfterCue: true, iOSPolicyAllowsIdealCue: true), .idealAudioAllowed)

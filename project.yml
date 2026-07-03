@@ -26,6 +26,14 @@ targets:
     platform: iOS
     sources:
       - NextSetApp
+      # Live Activity intents are compiled into the app too so LiveActivityIntent
+      # runs perform() in the app process (shared session mutation pipeline).
+      - NextSetLiveActivity/WorkoutIntents.swift
+    entitlements:
+      path: NextSetApp/NextSet.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.com.hsuneh.nextset
     dependencies:
       - target: NextSetCore
       - target: NextSetLiveActivity
@@ -50,6 +58,14 @@ targets:
     platform: iOS
     sources:
       - NextSetLiveActivity
+    entitlements:
+      path: NextSetLiveActivity/NextSetLiveActivity.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.com.hsuneh.nextset
+    dependencies:
+      - target: NextSetCore
+        embed: false
     info:
       path: NextSetLiveActivity/Info.plist
       properties:

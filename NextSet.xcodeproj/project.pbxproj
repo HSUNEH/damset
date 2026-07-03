@@ -11,13 +11,17 @@
 		14D551A2E85F0F8802867138 /* NextSetLiveActivityWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8501820D376ADA989C5CC19 /* NextSetLiveActivityWidget.swift */; };
 		1DCBFD137C0F8DE804814E84 /* NextSetCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 353E7AC50B32D58149EF135B /* NextSetCore.framework */; };
 		1FA1944505FC7FD235DEF0B0 /* WorkoutViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3EC4F8DAE6F7CCF2EB9E8D7 /* WorkoutViewModel.swift */; };
+		23EA17F38B9FD0089230D55B /* WorkoutIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 789D7EEF7F3C5BD0CA12E4B0 /* WorkoutIntents.swift */; };
+		51B613FC9CB43BF0F645F0E1 /* RestCue.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95C9C93B162979E9EFE7BE2C /* RestCue.swift */; };
 		624AC2829F18296AD80A656B /* NextSetLiveActivity.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 9FE56C0E833CFCFD259FCCF7 /* NextSetLiveActivity.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		669E08A9825CCBC78D8C9D6E /* NextSetCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 353E7AC50B32D58149EF135B /* NextSetCore.framework */; };
 		78D4AA0BE65822719505CD24 /* NextSetCore.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 353E7AC50B32D58149EF135B /* NextSetCore.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		881202887235F65D1597E89E /* RoutineListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0F634C1405EF72971C3949E /* RoutineListView.swift */; };
 		984892961B95A399DECEACA0 /* ActiveWorkoutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0FA003EAB126A7F305512219 /* ActiveWorkoutView.swift */; };
-		A21F9A98E3C5B9245F1654FB /* NextSetActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B2AABE81FD5AA42F7776C2C /* NextSetActivityAttributes.swift */; };
 		A830B28A76DA03BD5C5A696A /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41B79077A467A210654D543B /* Models.swift */; };
 		B1B2B2CD035A4FBD53F296E8 /* NextSetApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F49500D181387988A1C18685 /* NextSetApp.swift */; };
+		C6B8BAFB616BE72729D7AECC /* LiveActivitySupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDB8AB7FC019606778F7FF18 /* LiveActivitySupport.swift */; };
+		DA4F2BA77E0DE1CA7E16BED1 /* ActiveSessionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 410940B3754E266401A0D1A0 /* ActiveSessionStore.swift */; };
 		F46EDE817DAC0E0FD76A6D5E /* LocalWorkoutStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8844F70A017E04638FADF6E /* LocalWorkoutStore.swift */; };
 		F637F1B8958929F4296F1530 /* WorkoutEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 180FFF375946D8516BB99AB9 /* WorkoutEngine.swift */; };
 /* End PBXBuildFile section */
@@ -31,6 +35,13 @@
 			remoteInfo = NextSetLiveActivity;
 		};
 		970D80FDB479C76F8D196258 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 6D1955C82C0038D39D1BFEA9 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 696AB5839EF43596BD5CA28A;
+			remoteInfo = NextSetCore;
+		};
+		BF501D1ED2300F465949872B /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 6D1955C82C0038D39D1BFEA9 /* Project object */;
 			proxyType = 1;
@@ -67,17 +78,21 @@
 /* Begin PBXFileReference section */
 		0FA003EAB126A7F305512219 /* ActiveWorkoutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActiveWorkoutView.swift; sourceTree = "<group>"; };
 		180FFF375946D8516BB99AB9 /* WorkoutEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutEngine.swift; sourceTree = "<group>"; };
-		2B2AABE81FD5AA42F7776C2C /* NextSetActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NextSetActivityAttributes.swift; sourceTree = "<group>"; };
 		353E7AC50B32D58149EF135B /* NextSetCore.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = NextSetCore.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		410940B3754E266401A0D1A0 /* ActiveSessionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActiveSessionStore.swift; sourceTree = "<group>"; };
+		41B0033BEC8F11112516010E /* NextSet.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = NextSet.entitlements; sourceTree = "<group>"; };
 		41B79077A467A210654D543B /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		4A9CF87989B7C3B1A19C41A1 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		789D7EEF7F3C5BD0CA12E4B0 /* WorkoutIntents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutIntents.swift; sourceTree = "<group>"; };
+		878A7E4A28877DDC3B16E43E /* NextSetLiveActivity.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = NextSetLiveActivity.entitlements; sourceTree = "<group>"; };
+		95C9C93B162979E9EFE7BE2C /* RestCue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestCue.swift; sourceTree = "<group>"; };
 		9FE56C0E833CFCFD259FCCF7 /* NextSetLiveActivity.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = NextSetLiveActivity.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		A31B34B2B91B127EDAA95F07 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		A3EC4F8DAE6F7CCF2EB9E8D7 /* WorkoutViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutViewModel.swift; sourceTree = "<group>"; };
 		A8844F70A017E04638FADF6E /* LocalWorkoutStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalWorkoutStore.swift; sourceTree = "<group>"; };
 		B8501820D376ADA989C5CC19 /* NextSetLiveActivityWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NextSetLiveActivityWidget.swift; sourceTree = "<group>"; };
 		D3298C85A8D64BA44318B63A /* NextSet.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = NextSet.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		DDB8AB7FC019606778F7FF18 /* LiveActivitySupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveActivitySupport.swift; sourceTree = "<group>"; };
 		F0F634C1405EF72971C3949E /* RoutineListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoutineListView.swift; sourceTree = "<group>"; };
 		F49500D181387988A1C18685 /* NextSetApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NextSetApp.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -88,6 +103,14 @@
 			buildActionMask = 2147483647;
 			files = (
 				1DCBFD137C0F8DE804814E84 /* NextSetCore.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D3F5D1C9A7B6A5A28851BEC4 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				669E08A9825CCBC78D8C9D6E /* NextSetCore.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -117,6 +140,7 @@
 			children = (
 				0FA003EAB126A7F305512219 /* ActiveWorkoutView.swift */,
 				4A9CF87989B7C3B1A19C41A1 /* Info.plist */,
+				41B0033BEC8F11112516010E /* NextSet.entitlements */,
 				F49500D181387988A1C18685 /* NextSetApp.swift */,
 				F0F634C1405EF72971C3949E /* RoutineListView.swift */,
 				A3EC4F8DAE6F7CCF2EB9E8D7 /* WorkoutViewModel.swift */,
@@ -127,8 +151,11 @@
 		CB29BA3DDA84D3D3481A5BF4 /* NextSetCore */ = {
 			isa = PBXGroup;
 			children = (
+				410940B3754E266401A0D1A0 /* ActiveSessionStore.swift */,
+				DDB8AB7FC019606778F7FF18 /* LiveActivitySupport.swift */,
 				A8844F70A017E04638FADF6E /* LocalWorkoutStore.swift */,
 				41B79077A467A210654D543B /* Models.swift */,
+				95C9C93B162979E9EFE7BE2C /* RestCue.swift */,
 				180FFF375946D8516BB99AB9 /* WorkoutEngine.swift */,
 			);
 			path = NextSetCore;
@@ -138,7 +165,7 @@
 			isa = PBXGroup;
 			children = (
 				A31B34B2B91B127EDAA95F07 /* Info.plist */,
-				2B2AABE81FD5AA42F7776C2C /* NextSetActivityAttributes.swift */,
+				878A7E4A28877DDC3B16E43E /* NextSetLiveActivity.entitlements */,
 				B8501820D376ADA989C5CC19 /* NextSetLiveActivityWidget.swift */,
 				789D7EEF7F3C5BD0CA12E4B0 /* WorkoutIntents.swift */,
 			);
@@ -163,10 +190,12 @@
 			buildConfigurationList = 47A604EE0437329673651F22 /* Build configuration list for PBXNativeTarget "NextSetLiveActivity" */;
 			buildPhases = (
 				25432C669EEEF3ABE67C87B0 /* Sources */,
+				D3F5D1C9A7B6A5A28851BEC4 /* Frameworks */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				8C8E90953CDEBA81F5E5FC86 /* PBXTargetDependency */,
 			);
 			name = NextSetLiveActivity;
 			packageProductDependencies = (
@@ -260,8 +289,11 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				DA4F2BA77E0DE1CA7E16BED1 /* ActiveSessionStore.swift in Sources */,
+				C6B8BAFB616BE72729D7AECC /* LiveActivitySupport.swift in Sources */,
 				F46EDE817DAC0E0FD76A6D5E /* LocalWorkoutStore.swift in Sources */,
 				A830B28A76DA03BD5C5A696A /* Models.swift in Sources */,
+				51B613FC9CB43BF0F645F0E1 /* RestCue.swift in Sources */,
 				F637F1B8958929F4296F1530 /* WorkoutEngine.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -270,7 +302,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A21F9A98E3C5B9245F1654FB /* NextSetActivityAttributes.swift in Sources */,
 				14D551A2E85F0F8802867138 /* NextSetLiveActivityWidget.swift in Sources */,
 				10C02E437F8244090C9C50B5 /* WorkoutIntents.swift in Sources */,
 			);
@@ -283,6 +314,7 @@
 				984892961B95A399DECEACA0 /* ActiveWorkoutView.swift in Sources */,
 				B1B2B2CD035A4FBD53F296E8 /* NextSetApp.swift in Sources */,
 				881202887235F65D1597E89E /* RoutineListView.swift in Sources */,
+				23EA17F38B9FD0089230D55B /* WorkoutIntents.swift in Sources */,
 				1FA1944505FC7FD235DEF0B0 /* WorkoutViewModel.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -294,6 +326,11 @@
 			isa = PBXTargetDependency;
 			target = 696AB5839EF43596BD5CA28A /* NextSetCore */;
 			targetProxy = 970D80FDB479C76F8D196258 /* PBXContainerItemProxy */;
+		};
+		8C8E90953CDEBA81F5E5FC86 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 696AB5839EF43596BD5CA28A /* NextSetCore */;
+			targetProxy = BF501D1ED2300F465949872B /* PBXContainerItemProxy */;
 		};
 		ACA08193B09944446EF97427 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
@@ -328,6 +365,7 @@
 		1ECE345A2C6F7C7676A82400 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = NextSetLiveActivity/NextSetLiveActivity.entitlements;
 				INFOPLIST_FILE = NextSetLiveActivity/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -402,6 +440,7 @@
 		72B00AFEA7198C20C982E559 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = NextSetLiveActivity/NextSetLiveActivity.entitlements;
 				INFOPLIST_FILE = NextSetLiveActivity/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -419,6 +458,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = NextSetApp/NextSet.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				INFOPLIST_FILE = NextSetApp/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -458,6 +498,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = NextSetApp/NextSet.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				INFOPLIST_FILE = NextSetApp/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (

@@ -2,6 +2,14 @@
 import ActivityKit
 import SwiftUI
 import WidgetKit
+import NextSetCore
+
+@main
+struct NextSetWidgetBundle: WidgetBundle {
+    var body: some Widget {
+        NextSetLiveActivityWidget()
+    }
+}
 
 struct NextSetLiveActivityWidget: Widget {
     var body: some WidgetConfiguration {
@@ -23,39 +31,82 @@ struct NextSetLiveActivityWidget: Widget {
             } compactLeading: {
                 Text("\(context.state.currentSetIndex)/\(context.state.totalPlannedSets)")
             } compactTrailing: {
-                Text("\(context.state.actualReps)")
+                if isResting(context.state), let resumeAt = context.state.resumeAt {
+                    Text(timerInterval: Date.now...max(Date.now, resumeAt), countsDown: true)
+                        .monospacedDigit()
+                        .frame(maxWidth: 44)
+                } else {
+                    Text("\(context.state.actualReps)")
+                }
             } minimal: {
                 Image(systemName: "figure.strengthtraining.traditional")
             }
         }
     }
 
+    private func isResting(_ state: NextSetActivityAttributes.ContentState) -> Bool {
+        state.phase == LockScreenPhase.resting.rawValue || state.phase == LockScreenPhase.readyForNextSet.rawValue
+    }
+
     private func lockScreenView(context: ActivityViewContext<NextSetActivityAttributes>) -> some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 12) {
             HStack {
                 Text(context.state.exerciseName).font(.headline)
                 Spacer()
-                Text("Set \(context.state.currentSetIndex)/\(context.state.totalPlannedSets)").font(.subheadline)
+                Text("Set \(context.state.currentSetIndex)/\(context.state.totalPlannedSets)")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
             }
-            HStack(spacing: 28) {
-                Button(intent: AdjustRepsIntent(delta: -1)) { Image(systemName: "minus.circle.fill") }
-                Text("\(context.state.actualReps)")
-                    .font(.system(size: 34, weight: .bold, design: .rounded))
-                    .monospacedDigit()
-                Button(intent: AdjustRepsIntent(delta: 1)) { Image(systemName: "plus.circle.fill") }
-                Button(intent: CompleteSetIntent()) { Text("Done") }
+
+            if isResting(context.state), let resumeAt = context.state.resumeAt {
+                VStack(spacing: 4) {
+                    Text("Rest")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text(timerInterval: Date.now...max(Date.now, resumeAt), countsDown: true)
+                        .font(.system(size: 40, weight: .bold, design: .rounded))
+                        .monospacedDigit()
+                        .multilineTextAlignment(.center)
+                    Text("Resumes at \(resumeAt.formatted(date: .omitted, time: .shortened))")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            } else if context.state.phase == LockScreenPhase.completed.rawValue {
+                Label("Workout complete", systemImage: "checkmark.circle.fill")
+                    .font(.headline)
+            } else {
+                HStack(spacing: 20) {
+                    Button(intent: AdjustRepsIntent(delta: -1)) {
+                        Image(systemName: "minus.circle.fill")
+                            .font(.largeTitle)
+                    }
+                    .buttonStyle(.plain)
+
+                    VStack(spacing: 0) {
+                        Text("\(context.state.targetReps)")
+                            .font(.system(size: 40, weight: .bold, design: .rounded))
+                            .monospacedDigit()
+                        Text("did \(context.state.actualReps)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .monospacedDigit()
+                    }
+                    .frame(minWidth: 64)
+
+                    Button(intent: AdjustRepsIntent(delta: 1)) {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.largeTitle)
+                    }
+                    .buttonStyle(.plain)
+
+                    Button(intent: CompleteSetIntent()) {
+                        Text("Done").bold()
+                    }
                     .buttonStyle(.borderedProminent)
-            }
-            if context.state.restRemainingSeconds > 0 {
-                Text("Rest \(format(seconds: context.state.restRemainingSeconds))")
-                    .font(.headline.monospacedDigit())
+                }
             }
         }
         .padding()
-    }
-
-    private func format(seconds: Int) -> String {
-        String(format: "%02d:%02d", seconds / 60, seconds % 60)
     }
 }
 #endif

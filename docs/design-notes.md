@@ -46,4 +46,4 @@ Fallback condition:
 
 - If the ideal sequence interrupts/pauses playback, is blocked by iOS Lock Screen/background policy, or cannot be made reliable on-device, set fallback mode to `notificationSoundAndHaptics` and document the reason in the test result.
 
-Current status: implementation pending; requires real-device verification after the ActivityKit/UserNotifications path is wired.
+Current status: the ActivityKit/UserNotifications path is wired (`RestCueScheduler` notifications for background/locked, `InAppRestCuePlayer` spoken countdown + horn + haptics with audio ducking for foreground). Real-device verification of the music-playback pass condition is still pending; record results in the README "Rest cue and iOS audio behavior" section.

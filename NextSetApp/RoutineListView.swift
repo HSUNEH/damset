@@ -3,6 +3,7 @@ import NextSetCore
 
 struct RoutineListView: View {
     @State var viewModel: WorkoutViewModel
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         NavigationStack {
@@ -49,6 +50,11 @@ struct RoutineListView: View {
             .navigationTitle("NextSet")
             .workoutSessionCover(item: Binding(get: { viewModel.activeSession }, set: { viewModel.activeSession = $0 })) { _ in
                 ActiveWorkoutView(viewModel: viewModel)
+            }
+            .onChange(of: scenePhase) { _, phase in
+                if phase == .active {
+                    viewModel.refreshFromSharedStore()
+                }
             }
         }
     }

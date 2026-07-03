@@ -32,7 +32,7 @@ sudo xcodebuild -license accept
 After full Xcode is selected:
 
 ```bash
-cd /Users/sunbot/nextset
+cd <repo root>
 xcodebuild -project NextSet.xcodeproj -scheme NextSet -showdestinations
 xcodebuild -project NextSet.xcodeproj -scheme NextSet -destination 'platform=iOS Simulator,name=iPhone 16' build
 ```
@@ -64,22 +64,35 @@ Build/install through Xcode:
 4. Select the connected iPhone as destination.
 5. Press Run.
 
+### App Group signing note
+
+The app and the Live Activity extension share state through the
+`group.com.hsuneh.nextset` App Group (both targets carry generated
+`.entitlements` files). With automatic signing, Xcode registers the group on
+the selected team the first time you build. If the chosen team cannot register
+that identifier, change the group id in both entitlement blocks in
+`project.yml` **and** in `WorkoutSessionSync.appGroupId`
+(`Sources/NextSetCore/LiveActivitySupport.swift`), then regenerate the project.
+
 ## First QA after install
 
 1. Launch NextSet.
-2. Pick a default routine.
-3. Verify active workout screen shows exercise, set index, target reps, actual reps, `- / +`, and Set Done.
+2. Pick a default routine; accept the notification permission prompt (rest cues).
+3. Verify active workout screen shows exercise, set index, target weight/reps, actual reps `- / +`, weight `±2.5`, and Set Done.
 4. Tap `- / +` and verify actual reps change.
-5. Tap Set Done and verify rest state appears.
-6. Later, verify Live Activity on real Lock Screen and rest cue behavior with music playing.
+5. Tap Set Done and verify the rest countdown ticks down and a Live Activity appears (Lock Screen + Dynamic Island).
+6. Lock the iPhone: verify the Live Activity shows the rest countdown and resume time; after rest ends, `- / +` and Done should act on the next set.
+7. With music playing, verify the rest-end cue per README "Rest cue and iOS audio behavior" and record observed results there.
+8. Finish all sets and verify the workout appears under History with per-set records and totals.
 
 ## Notes
 
 - `NextSet.xcodeproj` was generated from `project.yml` using XcodeGen.
+- XcodeGen is installed locally at `~/.local/bin/xcodegen` (release binary; Homebrew unavailable on this machine).
 - Regenerate after editing `project.yml`:
 
 ```bash
-xcodegen generate
+~/.local/bin/xcodegen generate
 ```
 
 - Current local non-Xcode gate remains:

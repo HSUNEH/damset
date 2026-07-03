@@ -17,14 +17,15 @@ let package = Package(
         .target(name: "NextSetCore"),
         .target(
             name: "NextSetLiveActivity",
+            dependencies: ["NextSetCore"],
             path: "NextSetLiveActivity",
-            exclude: ["Info.plist"]
+            exclude: ["Info.plist", "NextSetLiveActivity.entitlements"]
         ),
         .executableTarget(
             name: "NextSetAppShell",
             dependencies: ["NextSetCore"],
             path: "NextSetApp",
-            exclude: ["Info.plist"]
+            exclude: ["Info.plist", "NextSet.entitlements"]
         ),
         .executableTarget(name: "NextSetCoreSmoke", dependencies: ["NextSetCore"])
     ]

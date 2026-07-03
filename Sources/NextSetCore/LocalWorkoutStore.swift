@@ -43,6 +43,16 @@ public final class FileWorkoutStore: LocalWorkoutStore, @unchecked Sendable {
         self.init(fileURL: url)
     }
 
+    /// Stores summaries in the shared App Group container so both the app and
+    /// the Live Activity extension read and write the same history.
+    public convenience init(appGroupId: String) {
+        guard let base = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupId) else {
+            self.init()
+            return
+        }
+        self.init(fileURL: base.appendingPathComponent("workout-summaries.json"))
+    }
+
     public func save(_ summary: WorkoutSummary) throws {
         lock.lock()
         defer { lock.unlock() }

@@ -33,6 +33,28 @@ Target experience:
 - The cue should be audible while workout music continues, where iOS policy and APIs allow it.
 - If iOS lock-screen/background audio constraints prevent the ideal cue, the MVP may fall back to notification sound + haptics while preserving the rest-timer flow.
 
+## Rest cue and iOS audio behavior
+
+Implemented behavior (two paths, selected by app state):
+
+- **App in foreground (ideal cue)** — `InAppRestCuePlayer` drives the rest tick: at 3/2/1 seconds remaining it speaks the number (`AVSpeechSynthesizer`) with a medium haptic, and at 0 it plays a horn system sound with a success haptic. The audio session uses `.playback` + `.duckOthers` and deactivates with `.notifyOthersOnDeactivation`, so workout music keeps playing (ducked during the cue) and returns to full volume afterwards.
+- **App backgrounded / iPhone locked (fallback: `notificationSoundAndHaptics`)** — iOS does not allow a backgrounded app to play arbitrary countdown audio on the Lock Screen. `RestCueScheduler` therefore schedules four local notifications at `resumeAt - 3s / -2s / -1s / 0s` titled `3`, `2`, `1`, `Next set — go!` with the default notification sound (vibration follows the user's sound/haptics settings). Advancing to the next set early or ending the workout cancels the pending cue notifications.
+
+Music playback test procedure (run on a real iPhone):
+
+1. Play music in Apple Music or Spotify and confirm the Now Playing state is `playing`.
+2. Start a routine in NextSet and complete a set; leave the app in the foreground for the ideal-cue path, or lock the iPhone for the fallback path.
+3. Observe the final 3 seconds of rest: expect `3, 2, 1, horn` (spoken + haptics in foreground; notification sounds when locked).
+4. After the cue, verify the music is still playing (ducking must recover in the foreground path; notification sounds never stop music playback).
+
+Observed results:
+
+- Local machine has no full Xcode/simulator, so on-device observation is **pending device QA** (see `docs/qa-automation.md`). Record `playbackStateBeforeCue` / `playbackStateAfterCue` and the reached cue sequence here after the first device run.
+
+Fallback conditions:
+
+- The fallback path is used whenever the app process cannot run the in-app cue at rest end: iPhone locked, app backgrounded or terminated, or Focus/notification permission denials preventing sound. If device QA shows the foreground path pausing music (`playbackStateAfterCue != playing`), ship with `fallbackMode = notificationSoundAndHaptics` and record the reason, per the seed spec.
+
 ## Initial platform decision
 
 - iPhone-only iOS app
@@ -65,7 +87,8 @@ This repo now contains a testable Swift core plus iOS app/Live Activity source s
 - `Sources/NextSetCore/` — routine catalog, planned/completed sets, workout session state, lock-screen state, rest cue policy, summary calculation, and local-store protocol with in-memory and JSON-file (`FileWorkoutStore`) implementations. Set completion accepts an optional actual-weight override (defaults to the planned target weight).
 - `Sources/NextSetCoreSmoke/` — executable smoke verification for default routines, reps adjustment, set completion, rest transitions, manual session-scoped sets, audio fallback policy, actual-weight override, full-session summary invariants, and file-store round-trip. `XcodeTests/NextSetCoreTests/` keeps XCTest coverage for full Xcode environments.
 - `NextSetApp/` — SwiftUI iPhone app for routine selection and active workout flow: 1 Hz rest countdown tick, actual-weight editing during a set, session-scoped set repeat, end-workout confirmation (full-screen cover so the session can't be swiped away), workout summaries persisted via `FileWorkoutStore`, and a History section with a per-set final record screen.
-- `NextSetLiveActivity/` — ActivityKit/App Intents widget scaffold for Lock Screen `- / +` and set completion actions.
+- `NextSetLiveActivity/` — ActivityKit widget for the Lock Screen / Dynamic Island: target reps centered with `- / +` actual reps adjustment and set completion via `LiveActivityIntent` (runs in the app process against the shared App Group session store), a self-updating rest countdown (`Text(timerInterval:)`), and resume-at time. The Live Activity starts when a workout starts, updates on every state change, and ends with the session.
+- App ↔ extension state sharing uses the `group.com.hsuneh.nextset` App Group: `ActiveSessionStore` holds the in-flight session, `FileWorkoutStore` holds saved summaries, and `WorkoutSessionSync` applies one shared side-effect pipeline (persist → schedule/cancel rest cues → sync Live Activity) for both the in-app UI and lock-screen intents.
 - `docs/design-notes.md` — Apple HIG checklist plus Rest cue and iOS audio behavior test policy.
 - `NextSet.xcodeproj` / `project.yml` — Xcode project generated with XcodeGen for iOS app, core framework, and Live Activity extension targets.
 - `docs/qa-automation.md` — layered QA plan for core tests, Xcode builds, simulator checks, real iPhone install, iPhone Mirroring/QuickTime screen-observed QA, and Lock Screen/Live Activity validation.

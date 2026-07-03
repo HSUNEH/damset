@@ -106,6 +106,16 @@ public struct WorkoutEngine: Sendable {
         }
     }
 
+    /// Brings a session up to date with wall-clock time. Once rest has fully
+    /// elapsed the session advances to the next set, so a lock-screen action
+    /// taken after the rest ended applies to the set the user is about to do.
+    public func refresh(session: inout WorkoutRoutineSession, now: Date = Date()) {
+        updateRest(session: &session, now: now)
+        if session.lockScreenState.phase == .readyForNextSet {
+            try? advanceToNextSet(session: &session)
+        }
+    }
+
     public func advanceToNextSet(session: inout WorkoutRoutineSession) throws {
         guard session.sessionStatus == .resting || session.lockScreenState.phase == .readyForNextSet else { return }
         let nextIndex = session.currentSetIndex + 1

@@ -2,10 +2,13 @@ import Foundation
 import Observation
 import NextSetCore
 
+@MainActor
 @Observable
 final class WorkoutViewModel {
     private let engine = WorkoutEngine()
     private let store: LocalWorkoutStore
+    private let sessionStore = WorkoutSessionSync.makeSessionStore()
+    private let cuePlayer = InAppRestCuePlayer()
     let catalog = RoutineCatalog()
     var activeSession: WorkoutRoutineSession?
     var lastSummary: WorkoutSummary?
@@ -13,9 +16,10 @@ final class WorkoutViewModel {
     var actualWeight: Double = 0
     var errorMessage: String?
 
-    init(store: LocalWorkoutStore = FileWorkoutStore()) {
+    init(store: LocalWorkoutStore = WorkoutSessionSync.makeSummaryStore()) {
         self.store = store
         reloadSummaries()
+        adoptSharedSessionIfPresent()
     }
 
     func start(_ routine: RoutineTemplate) {
@@ -24,6 +28,10 @@ final class WorkoutViewModel {
             activeSession = session
             actualWeight = session.currentPlannedSet?.targetWeight ?? 0
             lastSummary = nil
+            cuePlayer.reset()
+            RestCueScheduler.requestAuthorization()
+            WorkoutSessionSync.startLiveActivity(for: session)
+            sync(session)
         } catch {
             errorMessage = String(describing: error)
         }
@@ -34,6 +42,7 @@ final class WorkoutViewModel {
         do {
             try engine.adjustActualReps(session: &session, delta: delta)
             activeSession = session
+            sync(session)
         } catch {
             errorMessage = String(describing: error)
         }
@@ -47,13 +56,17 @@ final class WorkoutViewModel {
         guard var session = activeSession else { return }
         do {
             try engine.completeCurrentSet(session: &session, actualWeight: actualWeight)
-            if session.sessionStatus == .completed {
-                let summary = engine.summarize(session: session, endedAt: session.workoutEndTime ?? Date())
-                try store.save(summary)
-                lastSummary = summary
-                reloadSummaries()
-            }
             activeSession = session
+            cuePlayer.reset()
+            if session.sessionStatus == .completed {
+                lastSummary = engine.summarize(session: session, endedAt: session.workoutEndTime ?? Date())
+            }
+            let finished = session.sessionStatus == .completed
+            let snapshot = session
+            Task {
+                await WorkoutSessionSync.applyDidChange(snapshot)
+                if finished { reloadSummaries() }
+            }
         } catch {
             errorMessage = String(describing: error)
         }
@@ -65,6 +78,8 @@ final class WorkoutViewModel {
             try engine.advanceToNextSet(session: &session)
             activeSession = session
             actualWeight = session.currentPlannedSet?.targetWeight ?? actualWeight
+            cuePlayer.reset()
+            sync(session)
         } catch {
             errorMessage = String(describing: error)
         }
@@ -80,6 +95,7 @@ final class WorkoutViewModel {
             restDurationSeconds: planned.restDurationSeconds
         )
         activeSession = session
+        sync(session)
     }
 
     func tick(now: Date = Date()) {
@@ -88,10 +104,57 @@ final class WorkoutViewModel {
         if session != activeSession {
             activeSession = session
         }
+        cuePlayer.handleRestTick(remainingSeconds: session.lockScreenState.restRemainingSeconds)
     }
 
     func closeWorkout() {
         activeSession = nil
+        cuePlayer.reset()
+        Task {
+            RestCueScheduler.cancelPendingCues()
+            try? sessionStore.clear()
+            await WorkoutSessionSync.endAllLiveActivities()
+        }
+    }
+
+    /// Re-syncs with the App Group store after a Live Activity intent mutated
+    /// the session while the app was backgrounded.
+    func refreshFromSharedStore() {
+        reloadSummaries()
+        guard let current = activeSession else { return }
+        if let stored = try? sessionStore.load(), stored.sessionId == current.sessionId {
+            if stored != current {
+                activeSession = stored
+                actualWeight = stored.currentPlannedSet?.targetWeight ?? actualWeight
+                cuePlayer.reset()
+            }
+        } else if current.sessionStatus != .completed {
+            // The intent finished the workout: session file is gone, summary saved.
+            if let summary = try? store.summary(sessionId: current.sessionId) {
+                lastSummary = summary
+                var finished = current
+                finished.sessionStatus = .completed
+                finished.lockScreenState.phase = .completed
+                finished.lockScreenState.canCompleteSet = false
+                activeSession = finished
+            } else {
+                activeSession = nil
+            }
+        }
+    }
+
+    private func adoptSharedSessionIfPresent() {
+        guard let stored = try? sessionStore.load(),
+              stored.sessionStatus != .completed, stored.sessionStatus != .cancelled else { return }
+        activeSession = stored
+        actualWeight = stored.currentPlannedSet?.targetWeight ?? 0
+        WorkoutSessionSync.startLiveActivity(for: stored)
+    }
+
+    private func sync(_ session: WorkoutRoutineSession) {
+        Task {
+            await WorkoutSessionSync.applyDidChange(session)
+        }
     }
 
     private func reloadSummaries() {
