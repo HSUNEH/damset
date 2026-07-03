@@ -62,11 +62,11 @@ spoken countdown/horn/haptics, music ducking — layers 2–6 below.
 
 ### 2. Xcode/iOS build gate
 
-Requires full Xcode selected:
+Requires full Xcode selected — since 2026-07-03 this is the machine default
+(Xcode 26.6 at `/Applications/Xcode.app`, global `xcode-select`):
 
 ```bash
-sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
-xcodebuild -version
+xcodebuild -version   # Xcode 26.6 (17F113)
 ```
 
 Then add/run gates:
@@ -136,6 +136,16 @@ with stale content (controls now always visible; mid-rest taps no-op).
 Known cosmetic follow-ups: when a workout is completed from the Lock Screen,
 the app's completed screen still shows the previous set header (totals are
 correct); ended-activity header keeps the last exercise name.
+
+**Re-verified 2026-07-03 (evening) after the toolchain upgrade to
+macOS 26.5.2 + Xcode 26.6 (17F113, iOS 26.5 SDK):** full SwiftPM gate
+(Swift 6.3.3 rebuild + `DamSetCoreSmoke`), simulator build of all three
+targets, and an install/launch smoke on the iPhone 17 Pro simulator
+(iOS 26.3.1) — routine list rendered and the workout history recorded by the
+earlier 26.3-era QA survived the upgrade (persistence intact). The same build
+also installed and launched cleanly on a freshly created iPhone 17 Pro
+simulator running **iOS 26.5** (the physical iPhone's OS version). No source
+changes were needed for the new toolchain.
 
 ### 4. Real iPhone install + logs
 
@@ -216,6 +226,11 @@ Run on real iPhone:
 
 ## Current blockers
 
-- Full Xcode is not selected on this Mac; current `xcodebuild` fails because the active developer directory is Command Line Tools.
-- Real iPhone build/install requires signing setup and a connected trusted iPhone.
-- Final Lock Screen/audio behavior must be verified on physical device.
+- ~~Full Xcode is not selected on this Mac~~ — resolved 2026-07-03: Xcode 26.6
+  (iOS 26.5 SDK) is installed and globally selected; the iOS/Xcode version gap
+  against the iPhone (iOS 26.5) is closed.
+- Real iPhone build/install requires a stripped app-only variant (free
+  personal team cannot sign the App Group / Live Activity extension), plus a
+  connected trusted iPhone with Developer Mode enabled.
+- Final Lock Screen/audio behavior (spoken 3-2-1 + horn over ducked music)
+  must be verified on the physical device.

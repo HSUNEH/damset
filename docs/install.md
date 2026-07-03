@@ -2,20 +2,22 @@
 
 ## Current state
 
-**Xcode 26.3 (17C529) is installed at `/Applications/Xcode.app`** (downloaded
-from developer.apple.com — the App Store's newer Xcode requires macOS 26.2+,
-while this Mac runs Sequoia 15.7; Xcode 26.3 is the last release supporting
-macOS 15.6+). The global `xcode-select` still points at Command Line Tools on
-purpose; prefix commands with `DEVELOPER_DIR` instead:
+**Xcode 26.6 (17F113, iOS 26.5 SDK) is installed at `/Applications/Xcode.app`**
+(App Store install on 2026-07-03, after this Mac was upgraded from Sequoia 15.7
+to macOS 26.5.2 — that upgrade removed the old "App Store Xcode needs
+macOS 26.2+" ceiling that had pinned the machine to Xcode 26.3). The global
+`xcode-select` now points at full Xcode, so no `DEVELOPER_DIR` prefix is
+needed anymore:
 
 ```bash
-export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
-xcodebuild -version   # Xcode 26.3
+xcodebuild -version   # Xcode 26.6 (17F113)
 ```
 
-The iOS 26.3.1 simulator runtime is installed (`xcodebuild -downloadPlatform iOS`)
-and the app has been built, installed, and QA'd on the iPhone 17 Pro simulator
-(see `docs/qa-automation.md`).
+The App Store build ships without the iOS platform; it was added with
+`xcodebuild -downloadPlatform iOS` (iOS 26.5 simulator runtime + device
+support, ~8.5 GB). Both the iOS 26.3.1 and 26.5 simulator runtimes are
+installed, and the app has been rebuilt with the 26.6 toolchain and re-QA'd
+on the simulator (see `docs/qa-automation.md`).
 
 ## One-time Mac setup
 
@@ -98,6 +100,16 @@ closed.
 Note: `Xcode 26.3` was signed into with Apple ID `iamsuntae@gmail.com`
 (Personal Team) for this attempt.
 
+**Update 2026-07-03 (evening): blocker 1 is resolved.** macOS 26.5.2 +
+Xcode 26.6 (iOS 26.5 SDK) now match the device's iOS 26.5, and the full
+toolchain re-test passed (SwiftPM gate, smoke run, simulator
+build/install/launch). Still open for the next on-device session:
+
+- Blocker 2 — build the stripped app-only variant (drop the Live Activity
+  extension + App Group) so a free personal team can sign it.
+- Blocker 3 — enable Developer Mode on the iPhone and connect it
+  (`devicectl` listed it as unavailable/disconnected during this session).
+
 ### App Group signing note
 
 The app and the Live Activity extension share state through the
@@ -121,6 +133,12 @@ that identifier, change the group id in both entitlement blocks in
 
 ## Notes
 
+- Gotcha (hit 2026-07-03): if `xcrun simctl runtime list` shows a duplicate
+  runtime disk image ("Unusable — Duplicate of <uuid>"), do **not**
+  `simctl runtime delete` the duplicate record — both records share one
+  underlying OTA asset, and deleting either removes the asset for both
+  (the surviving record then silently unregisters). Recover by re-running
+  `xcodebuild -downloadPlatform iOS`.
 - `DamSet.xcodeproj` was generated from `project.yml` using XcodeGen.
 - XcodeGen is installed locally at `~/.local/bin/xcodegen` (release binary; Homebrew unavailable on this machine).
 - Regenerate after editing `project.yml`:
