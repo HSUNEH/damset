@@ -50,7 +50,7 @@ struct ActiveWorkoutView: View {
 
     private func workoutContent(_ session: WorkoutRoutineSession) -> some View {
         ScrollView {
-            VStack(spacing: 18) {
+            VStack(spacing: 12) {
                 workoutHeader(session)
                 workoutFlowCard(session)
                 targetCard(session)
@@ -66,12 +66,12 @@ struct ActiveWorkoutView: View {
                 }
             }
             .padding(.horizontal, 20)
-            .padding(.vertical, 18)
+            .padding(.vertical, 12)
         }
     }
 
     private func workoutHeader(_ session: WorkoutRoutineSession) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(session.routineName)
@@ -80,7 +80,7 @@ struct ActiveWorkoutView: View {
                         .tracking(0.8)
                         .foregroundStyle(.white.opacity(0.62))
                     Text(session.lockScreenState.exerciseName)
-                        .font(.system(size: 34, weight: .bold, design: .rounded))
+                        .font(.system(size: 30, weight: .bold, design: .rounded))
                         .foregroundStyle(.white)
                         .lineLimit(2)
                         .minimumScaleFactor(0.75)
@@ -138,18 +138,18 @@ struct ActiveWorkoutView: View {
     }
 
     private func targetCard(_ session: WorkoutRoutineSession) -> some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 4) {
             Text("TARGET REPS")
-                .font(.caption.weight(.semibold))
+                .font(.caption2.weight(.semibold))
                 .tracking(1)
                 .foregroundStyle(.secondary)
             Text("\(session.lockScreenState.targetReps)")
-                .font(.system(size: 84, weight: .bold, design: .rounded))
+                .font(.system(size: 68, weight: .bold, design: .rounded))
                 .monospacedDigit()
                 .contentTransition(.numericText())
             if let planned = session.currentPlannedSet {
                 Text("\(planned.targetWeight.formatted()) kg × \(planned.targetReps) · \(format(seconds: planned.restDurationSeconds)) rest")
-                    .font(.subheadline)
+                    .font(.caption)
                     .foregroundStyle(.secondary)
                     .monospacedDigit()
             }
@@ -167,7 +167,7 @@ struct ActiveWorkoutView: View {
     }
 
     private func repsControl(_ session: WorkoutRoutineSession) -> some View {
-        HStack(spacing: 22) {
+        HStack(spacing: 16) {
             CircleControl(symbol: "minus", label: "Decrease reps") {
                 viewModel.adjustReps(-1)
             }
@@ -179,7 +179,7 @@ struct ActiveWorkoutView: View {
                     .tracking(1)
                     .foregroundStyle(.secondary)
                 Text("\(session.lockScreenState.actualReps)")
-                    .font(.system(size: 50, weight: .semibold, design: .rounded))
+                    .font(.system(size: 42, weight: .semibold, design: .rounded))
                     .monospacedDigit()
                     .contentTransition(.numericText())
                     .accessibilityLabel("Actual reps")
@@ -397,7 +397,7 @@ private struct CircleControl: View {
         Button(action: action) {
             Image(systemName: symbol)
                 .font(.title.bold())
-                .frame(width: 66, height: 66)
+                .frame(width: 58, height: 58)
                 .background(NextSetDesign.activeGradient, in: Circle())
                 .foregroundStyle(.white)
         }

@@ -21,6 +21,7 @@ struct RoutineListView: View {
             }
             .background(NextSetDesign.appGradient.ignoresSafeArea())
             .navigationTitle("NextSet")
+            .inlineNavigationTitle()
             .workoutSessionCover(item: Binding(get: { viewModel.activeSession }, set: { viewModel.activeSession = $0 })) { _ in
                 ActiveWorkoutView(viewModel: viewModel)
             }

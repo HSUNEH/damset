@@ -39,7 +39,7 @@ enum NextSetDesign {
         case let id where id.contains("push"):
             return "figure.strengthtraining.traditional"
         case let id where id.contains("pull"):
-            return "figure.pullup"
+            return "dumbbell.fill"
         case let id where id.contains("legs"):
             return "figure.run"
         default:
