@@ -20,6 +20,7 @@
 		984892961B95A399DECEACA0 /* ActiveWorkoutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0FA003EAB126A7F305512219 /* ActiveWorkoutView.swift */; };
 		A830B28A76DA03BD5C5A696A /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41B79077A467A210654D543B /* Models.swift */; };
 		B1B2B2CD035A4FBD53F296E8 /* NextSetApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F49500D181387988A1C18685 /* NextSetApp.swift */; };
+		BAEE665C3DD5FD0F63FB02D1 /* NextSetDesign.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FF4E49951F19366A1755D2D /* NextSetDesign.swift */; };
 		C6B8BAFB616BE72729D7AECC /* LiveActivitySupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDB8AB7FC019606778F7FF18 /* LiveActivitySupport.swift */; };
 		DA4F2BA77E0DE1CA7E16BED1 /* ActiveSessionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 410940B3754E266401A0D1A0 /* ActiveSessionStore.swift */; };
 		F46EDE817DAC0E0FD76A6D5E /* LocalWorkoutStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8844F70A017E04638FADF6E /* LocalWorkoutStore.swift */; };
@@ -83,6 +84,7 @@
 		41B0033BEC8F11112516010E /* NextSet.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = NextSet.entitlements; sourceTree = "<group>"; };
 		41B79077A467A210654D543B /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		4A9CF87989B7C3B1A19C41A1 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		4FF4E49951F19366A1755D2D /* NextSetDesign.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NextSetDesign.swift; sourceTree = "<group>"; };
 		789D7EEF7F3C5BD0CA12E4B0 /* WorkoutIntents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutIntents.swift; sourceTree = "<group>"; };
 		878A7E4A28877DDC3B16E43E /* NextSetLiveActivity.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = NextSetLiveActivity.entitlements; sourceTree = "<group>"; };
 		95C9C93B162979E9EFE7BE2C /* RestCue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestCue.swift; sourceTree = "<group>"; };
@@ -142,6 +144,7 @@
 				4A9CF87989B7C3B1A19C41A1 /* Info.plist */,
 				41B0033BEC8F11112516010E /* NextSet.entitlements */,
 				F49500D181387988A1C18685 /* NextSetApp.swift */,
+				4FF4E49951F19366A1755D2D /* NextSetDesign.swift */,
 				F0F634C1405EF72971C3949E /* RoutineListView.swift */,
 				A3EC4F8DAE6F7CCF2EB9E8D7 /* WorkoutViewModel.swift */,
 			);
@@ -313,6 +316,7 @@
 			files = (
 				984892961B95A399DECEACA0 /* ActiveWorkoutView.swift in Sources */,
 				B1B2B2CD035A4FBD53F296E8 /* NextSetApp.swift in Sources */,
+				BAEE665C3DD5FD0F63FB02D1 /* NextSetDesign.swift in Sources */,
 				881202887235F65D1597E89E /* RoutineListView.swift in Sources */,
 				23EA17F38B9FD0089230D55B /* WorkoutIntents.swift in Sources */,
 				1FA1944505FC7FD235DEF0B0 /* WorkoutViewModel.swift in Sources */,

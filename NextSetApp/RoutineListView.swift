@@ -7,46 +7,19 @@ struct RoutineListView: View {
 
     var body: some View {
         NavigationStack {
-            List {
-                Section("Routines") {
-                    ForEach(viewModel.catalog.routines) { routine in
-                        Button {
-                            viewModel.start(routine)
-                        } label: {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(routine.routineName)
-                                    .font(.headline)
-                                Text("\(routine.plannedSets.count) sets")
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
-                            }
-                            .padding(.vertical, 8)
-                        }
+            ScrollView {
+                VStack(alignment: .leading, spacing: 24) {
+                    heroHeader
+                    routineSection
+                    if !viewModel.savedSummaries.isEmpty {
+                        historySection
                     }
                 }
-
-                if !viewModel.savedSummaries.isEmpty {
-                    Section("History") {
-                        ForEach(viewModel.savedSummaries) { summary in
-                            NavigationLink {
-                                WorkoutSummaryDetailView(summary: summary)
-                            } label: {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(summary.routineName)
-                                        .font(.headline)
-                                    Text(summary.workoutEndTime.formatted(date: .abbreviated, time: .shortened))
-                                        .font(.subheadline)
-                                        .foregroundStyle(.secondary)
-                                    Text("\(summary.totalSets) sets · \(summary.totalVolume.formatted()) kg")
-                                        .font(.subheadline)
-                                        .foregroundStyle(.secondary)
-                                }
-                                .padding(.vertical, 4)
-                            }
-                        }
-                    }
-                }
+                .padding(.horizontal, 20)
+                .padding(.top, 12)
+                .padding(.bottom, 28)
             }
+            .background(NextSetDesign.appGradient.ignoresSafeArea())
             .navigationTitle("NextSet")
             .workoutSessionCover(item: Binding(get: { viewModel.activeSession }, set: { viewModel.activeSession = $0 })) { _ in
                 ActiveWorkoutView(viewModel: viewModel)
@@ -57,6 +30,174 @@ struct RoutineListView: View {
                 }
             }
         }
+        .tint(NextSetDesign.accent)
+    }
+
+    private var heroHeader: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("NextSet")
+                        .font(.system(size: 42, weight: .bold, design: .rounded))
+                        .foregroundStyle(.white)
+                    Text("Pick a routine, then keep your phone locked while the set and rest flow stays live.")
+                        .font(.callout)
+                        .foregroundStyle(.white.opacity(0.72))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer()
+                Image(systemName: "bolt.heart.fill")
+                    .font(.system(size: 28, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 56, height: 56)
+                    .background(NextSetDesign.activeGradient, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            }
+
+            HStack(spacing: 10) {
+                MetricPill(title: "Routines", value: "\(viewModel.catalog.routines.count)", symbol: "list.bullet.rectangle")
+                MetricPill(title: "Saved", value: "\(viewModel.savedSummaries.count)", symbol: "clock.arrow.circlepath")
+            }
+        }
+        .nextSetCard(cornerRadius: 32)
+    }
+
+    private var routineSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            SectionHeader(title: "Start workout", subtitle: "Apple-native controls, Lock Screen ready")
+            ForEach(viewModel.catalog.routines) { routine in
+                RoutineCard(routine: routine) {
+                    viewModel.start(routine)
+                }
+            }
+        }
+    }
+
+    private var historySection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            SectionHeader(title: "History", subtitle: "Recent completed sessions")
+            VStack(spacing: 10) {
+                ForEach(viewModel.savedSummaries) { summary in
+                    NavigationLink {
+                        WorkoutSummaryDetailView(summary: summary)
+                    } label: {
+                        HistoryRow(summary: summary)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+}
+
+private struct SectionHeader: View {
+    let title: String
+    let subtitle: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title)
+                .font(.title2.bold())
+                .foregroundStyle(.white)
+            Text(subtitle)
+                .font(.subheadline)
+                .foregroundStyle(.white.opacity(0.62))
+        }
+    }
+}
+
+private struct MetricPill: View {
+    let title: String
+    let value: String
+    let symbol: String
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: symbol)
+            Text(value).bold()
+            Text(title)
+                .foregroundStyle(.secondary)
+        }
+        .font(.caption)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(.thinMaterial, in: Capsule())
+        .foregroundStyle(.white)
+    }
+}
+
+private struct RoutineCard: View {
+    let routine: RoutineTemplate
+    let start: () -> Void
+
+    var body: some View {
+        Button(action: start) {
+            HStack(spacing: 16) {
+                Image(systemName: NextSetDesign.routineSymbol(for: routine))
+                    .font(.system(size: 24, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 58, height: 58)
+                    .background(NextSetDesign.routineTint(for: routine).gradient, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(routine.routineName)
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+                    Text(routineSummary(routine))
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                    Text("\(routine.plannedSets.count) sets · \(totalRestMinutes(routine)) min rest")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Image(systemName: "chevron.right.circle.fill")
+                    .font(.title3)
+                    .foregroundStyle(NextSetDesign.routineTint(for: routine))
+            }
+            .nextSetCard(cornerRadius: 26)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func routineSummary(_ routine: RoutineTemplate) -> String {
+        let names = Array(Set(routine.plannedSets.map(\.exerciseName))).sorted()
+        return names.prefix(2).joined(separator: " · ")
+    }
+
+    private func totalRestMinutes(_ routine: RoutineTemplate) -> Int {
+        routine.plannedSets.reduce(0) { $0 + $1.restDurationSeconds } / 60
+    }
+}
+
+private struct HistoryRow: View {
+    let summary: WorkoutSummary
+
+    var body: some View {
+        HStack(spacing: 14) {
+            Image(systemName: "checkmark.seal.fill")
+                .foregroundStyle(.green)
+                .font(.title2)
+                .frame(width: 44, height: 44)
+                .background(.green.opacity(0.12), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            VStack(alignment: .leading, spacing: 4) {
+                Text(summary.routineName)
+                    .font(.headline)
+                Text(summary.workoutEndTime.formatted(date: .abbreviated, time: .shortened))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            VStack(alignment: .trailing, spacing: 4) {
+                Text("\(summary.totalSets) sets")
+                    .font(.subheadline.weight(.semibold))
+                Text("\(summary.totalVolume.formatted()) kg")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+            }
+        }
+        .nextSetCard(cornerRadius: 22)
     }
 }
 
