@@ -52,6 +52,7 @@ struct ActiveWorkoutView: View {
         ScrollView {
             VStack(spacing: 18) {
                 workoutHeader(session)
+                workoutFlowCard(session)
                 targetCard(session)
                 repsControl(session)
 
@@ -100,6 +101,42 @@ struct ActiveWorkoutView: View {
         .nextSetCard(cornerRadius: 30)
     }
 
+    private func workoutFlowCard(_ session: WorkoutRoutineSession) -> some View {
+        HStack(spacing: 12) {
+            FlowMetric(
+                title: "Completed",
+                value: "\(session.completedSets.count)",
+                caption: "sets",
+                symbol: "checkmark.circle.fill",
+                color: NextSetDesign.mint
+            )
+
+            Divider()
+                .overlay(.white.opacity(0.12))
+
+            FlowMetric(
+                title: session.lockScreenState.phase == .resting ? "Resting" : "Now",
+                value: phaseValue(for: session.lockScreenState),
+                caption: phaseCaption(for: session),
+                symbol: phaseSymbol(for: session.lockScreenState.phase),
+                color: phaseColor(for: session.lockScreenState.phase)
+            )
+
+            Divider()
+                .overlay(.white.opacity(0.12))
+
+            FlowMetric(
+                title: "Next",
+                value: nextExerciseName(after: session) ?? "Done",
+                caption: nextSetCaption(after: session),
+                symbol: "forward.fill",
+                color: .white.opacity(0.82)
+            )
+        }
+        .frame(maxWidth: .infinity)
+        .nextSetCard(cornerRadius: 26)
+    }
+
     private func targetCard(_ session: WorkoutRoutineSession) -> some View {
         VStack(spacing: 8) {
             Text("TARGET REPS")
@@ -114,6 +151,14 @@ struct ActiveWorkoutView: View {
                 Text("\(planned.targetWeight.formatted()) kg × \(planned.targetReps) · \(format(seconds: planned.restDurationSeconds)) rest")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
+                    .monospacedDigit()
+            }
+            if let last = session.completedSets.last {
+                Label("Last: \(last.exerciseName) · \(last.actualWeight.formatted()) kg × \(last.actualReps)", systemImage: "clock.arrow.circlepath")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
                     .monospacedDigit()
             }
         }
@@ -242,8 +287,104 @@ struct ActiveWorkoutView: View {
         return Double(completed) / Double(total)
     }
 
+    private func phaseValue(for state: LockScreenState) -> String {
+        switch state.phase {
+        case .performingSet:
+            return "Set \(state.currentSetIndex)"
+        case .resting, .readyForNextSet:
+            return format(seconds: state.restRemainingSeconds)
+        case .completed:
+            return "Done"
+        }
+    }
+
+    private func phaseCaption(for session: WorkoutRoutineSession) -> String {
+        switch session.lockScreenState.phase {
+        case .performingSet:
+            return "working"
+        case .resting:
+            return "left"
+        case .readyForNextSet:
+            return "ready"
+        case .completed:
+            return "saved"
+        }
+    }
+
+    private func phaseSymbol(for phase: LockScreenPhase) -> String {
+        switch phase {
+        case .performingSet:
+            return "figure.strengthtraining.traditional"
+        case .resting:
+            return "timer"
+        case .readyForNextSet:
+            return "bell.and.waves.left.and.right.fill"
+        case .completed:
+            return "checkmark.seal.fill"
+        }
+    }
+
+    private func phaseColor(for phase: LockScreenPhase) -> Color {
+        switch phase {
+        case .performingSet:
+            return NextSetDesign.accent
+        case .resting:
+            return NextSetDesign.orange
+        case .readyForNextSet:
+            return NextSetDesign.mint
+        case .completed:
+            return .green
+        }
+    }
+
+    private func nextExerciseName(after session: WorkoutRoutineSession) -> String? {
+        let nextIndex = session.currentSetIndex
+        guard session.plannedSets.indices.contains(nextIndex) else { return nil }
+        return session.plannedSets[nextIndex].exerciseName
+    }
+
+    private func nextSetCaption(after session: WorkoutRoutineSession) -> String {
+        let nextIndex = session.currentSetIndex
+        guard session.plannedSets.indices.contains(nextIndex) else { return "finish" }
+        let next = session.plannedSets[nextIndex]
+        return "\(next.targetWeight.formatted()) kg × \(next.targetReps)"
+    }
+
     private func format(seconds: Int) -> String {
         String(format: "%02d:%02d", seconds / 60, seconds % 60)
+    }
+}
+
+private struct FlowMetric: View {
+    let title: String
+    let value: String
+    let caption: String
+    let symbol: String
+    let color: Color
+
+    var body: some View {
+        VStack(spacing: 6) {
+            Image(systemName: symbol)
+                .font(.headline)
+                .foregroundStyle(color)
+            Text(title)
+                .font(.caption2.weight(.semibold))
+                .textCase(.uppercase)
+                .tracking(0.5)
+                .foregroundStyle(.secondary)
+            Text(value)
+                .font(.headline.weight(.bold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.62)
+                .monospacedDigit()
+            Text(caption)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+        }
+        .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .combine)
     }
 }
 

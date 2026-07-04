@@ -5,6 +5,7 @@ enum NextSetDesign {
     static let accent = Color(red: 0.20, green: 0.48, blue: 1.0)
     static let mint = Color(red: 0.24, green: 0.78, blue: 0.63)
     static let orange = Color(red: 1.0, green: 0.58, blue: 0.22)
+    static let pink = Color(red: 1.0, green: 0.33, blue: 0.58)
     static var appGradient: LinearGradient {
         LinearGradient(
             colors: [
@@ -20,6 +21,14 @@ enum NextSetDesign {
     static var activeGradient: LinearGradient {
         LinearGradient(
             colors: [accent.opacity(0.95), mint.opacity(0.82)],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+
+    static var warningGradient: LinearGradient {
+        LinearGradient(
+            colors: [orange.opacity(0.95), pink.opacity(0.82)],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
         )
