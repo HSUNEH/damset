@@ -1,4 +1,4 @@
-name: NextSet
+name: DamSet
 options:
   bundleIdPrefix: com.hsuneh
   deploymentTarget:
@@ -12,37 +12,37 @@ settings:
     ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS: YES
 packages: {}
 targets:
-  NextSetCore:
+  DamSetCore:
     type: framework
     platform: iOS
     sources:
-      - Sources/NextSetCore
+      - Sources/DamSetCore
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.hsuneh.nextset.core
+        PRODUCT_BUNDLE_IDENTIFIER: com.hsuneh.damset.core
         SKIP_INSTALL: YES
         GENERATE_INFOPLIST_FILE: YES
-  NextSet:
+  DamSet:
     type: application
     platform: iOS
     sources:
-      - NextSetApp
+      - DamSetApp
       # Live Activity intents are compiled into the app too so LiveActivityIntent
       # runs perform() in the app process (shared session mutation pipeline).
-      - NextSetLiveActivity/WorkoutIntents.swift
+      - DamSetLiveActivity/WorkoutIntents.swift
     entitlements:
-      path: NextSetApp/NextSet.entitlements
+      path: DamSetApp/DamSet.entitlements
       properties:
         com.apple.security.application-groups:
-          - group.com.hsuneh.nextset
+          - group.com.hsuneh.damset
     dependencies:
-      - target: NextSetCore
-      - target: NextSetLiveActivity
+      - target: DamSetCore
+      - target: DamSetLiveActivity
         embed: true
     info:
-      path: NextSetApp/Info.plist
+      path: DamSetApp/Info.plist
       properties:
-        CFBundleDisplayName: NextSet
+        CFBundleDisplayName: DamSet
         CFBundleShortVersionString: "0.1.0"
         CFBundleVersion: "1"
         UILaunchScreen: {}
@@ -50,42 +50,42 @@ targets:
         NSSupportsLiveActivities: true
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.hsuneh.nextset
+        PRODUCT_BUNDLE_IDENTIFIER: com.hsuneh.damset
         TARGETED_DEVICE_FAMILY: "1"
         SUPPORTS_MACCATALYST: NO
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
-  NextSetLiveActivity:
+  DamSetLiveActivity:
     type: app-extension
     platform: iOS
     sources:
-      - NextSetLiveActivity
+      - DamSetLiveActivity
     entitlements:
-      path: NextSetLiveActivity/NextSetLiveActivity.entitlements
+      path: DamSetLiveActivity/DamSetLiveActivity.entitlements
       properties:
         com.apple.security.application-groups:
-          - group.com.hsuneh.nextset
+          - group.com.hsuneh.damset
     dependencies:
-      - target: NextSetCore
+      - target: DamSetCore
         embed: false
     info:
-      path: NextSetLiveActivity/Info.plist
+      path: DamSetLiveActivity/Info.plist
       properties:
-        CFBundleDisplayName: NextSet Live Activity
+        CFBundleDisplayName: DamSet Live Activity
         CFBundleShortVersionString: "0.1.0"
         CFBundleVersion: "1"
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.hsuneh.nextset.liveactivity
+        PRODUCT_BUNDLE_IDENTIFIER: com.hsuneh.damset.liveactivity
         SKIP_INSTALL: YES
 schemes:
-  NextSet:
+  DamSet:
     build:
       targets:
-        NextSet: all
-        NextSetCore: all
-        NextSetLiveActivity: all
+        DamSet: all
+        DamSetCore: all
+        DamSetLiveActivity: all
     run:
       config: Debug
     test:

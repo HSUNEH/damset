@@ -2,31 +2,31 @@
 import PackageDescription
 
 let package = Package(
-    name: "NextSet",
+    name: "DamSet",
     platforms: [
         .iOS(.v17),
         .macOS(.v14)
     ],
     products: [
-        .library(name: "NextSetCore", targets: ["NextSetCore"]),
-        .library(name: "NextSetLiveActivity", targets: ["NextSetLiveActivity"]),
-        .executable(name: "NextSetAppShell", targets: ["NextSetAppShell"]),
-        .executable(name: "NextSetCoreSmoke", targets: ["NextSetCoreSmoke"])
+        .library(name: "DamSetCore", targets: ["DamSetCore"]),
+        .library(name: "DamSetLiveActivity", targets: ["DamSetLiveActivity"]),
+        .executable(name: "DamSetAppShell", targets: ["DamSetAppShell"]),
+        .executable(name: "DamSetCoreSmoke", targets: ["DamSetCoreSmoke"])
     ],
     targets: [
-        .target(name: "NextSetCore"),
+        .target(name: "DamSetCore"),
         .target(
-            name: "NextSetLiveActivity",
-            dependencies: ["NextSetCore"],
-            path: "NextSetLiveActivity",
-            exclude: ["Info.plist", "NextSetLiveActivity.entitlements"]
+            name: "DamSetLiveActivity",
+            dependencies: ["DamSetCore"],
+            path: "DamSetLiveActivity",
+            exclude: ["Info.plist", "DamSetLiveActivity.entitlements"]
         ),
         .executableTarget(
-            name: "NextSetAppShell",
-            dependencies: ["NextSetCore"],
-            path: "NextSetApp",
-            exclude: ["Info.plist", "NextSet.entitlements"]
+            name: "DamSetAppShell",
+            dependencies: ["DamSetCore"],
+            path: "DamSetApp",
+            exclude: ["Info.plist", "DamSet.entitlements"]
         ),
-        .executableTarget(name: "NextSetCoreSmoke", dependencies: ["NextSetCore"])
+        .executableTarget(name: "DamSetCoreSmoke", dependencies: ["DamSetCore"])
     ]
 )

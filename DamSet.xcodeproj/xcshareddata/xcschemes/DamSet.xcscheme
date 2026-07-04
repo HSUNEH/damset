@@ -15,10 +15,10 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "2117AFB6372848F6F1777C1B"
-               BuildableName = "NextSet.app"
-               BlueprintName = "NextSet"
-               ReferencedContainer = "container:NextSet.xcodeproj">
+               BlueprintIdentifier = "4AFA71E98FD0BD1D72ADE20A"
+               BuildableName = "DamSet.app"
+               BlueprintName = "DamSet"
+               ReferencedContainer = "container:DamSet.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
          <BuildActionEntry
@@ -29,10 +29,10 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "696AB5839EF43596BD5CA28A"
-               BuildableName = "NextSetCore.framework"
-               BlueprintName = "NextSetCore"
-               ReferencedContainer = "container:NextSet.xcodeproj">
+               BlueprintIdentifier = "9AEEC5243426F7D0B2C8F2A2"
+               BuildableName = "DamSetCore.framework"
+               BlueprintName = "DamSetCore"
+               ReferencedContainer = "container:DamSet.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
          <BuildActionEntry
@@ -43,10 +43,10 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "01FCE707D25D5862E86371F6"
-               BuildableName = "NextSetLiveActivity.appex"
-               BlueprintName = "NextSetLiveActivity"
-               ReferencedContainer = "container:NextSet.xcodeproj">
+               BlueprintIdentifier = "67DFC9D5CEA70451AFCB2FE6"
+               BuildableName = "DamSetLiveActivity.appex"
+               BlueprintName = "DamSetLiveActivity"
+               ReferencedContainer = "container:DamSet.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -60,10 +60,10 @@
       <MacroExpansion>
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "2117AFB6372848F6F1777C1B"
-            BuildableName = "NextSet.app"
-            BlueprintName = "NextSet"
-            ReferencedContainer = "container:NextSet.xcodeproj">
+            BlueprintIdentifier = "4AFA71E98FD0BD1D72ADE20A"
+            BuildableName = "DamSet.app"
+            BlueprintName = "DamSet"
+            ReferencedContainer = "container:DamSet.xcodeproj">
          </BuildableReference>
       </MacroExpansion>
       <Testables>
@@ -85,10 +85,10 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "2117AFB6372848F6F1777C1B"
-            BuildableName = "NextSet.app"
-            BlueprintName = "NextSet"
-            ReferencedContainer = "container:NextSet.xcodeproj">
+            BlueprintIdentifier = "4AFA71E98FD0BD1D72ADE20A"
+            BuildableName = "DamSet.app"
+            BlueprintName = "DamSet"
+            ReferencedContainer = "container:DamSet.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
       <CommandLineArguments>
@@ -104,10 +104,10 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "2117AFB6372848F6F1777C1B"
-            BuildableName = "NextSet.app"
-            BlueprintName = "NextSet"
-            ReferencedContainer = "container:NextSet.xcodeproj">
+            BlueprintIdentifier = "4AFA71E98FD0BD1D72ADE20A"
+            BuildableName = "DamSet.app"
+            BlueprintName = "DamSet"
+            ReferencedContainer = "container:DamSet.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>

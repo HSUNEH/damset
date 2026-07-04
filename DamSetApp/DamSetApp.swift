@@ -1,8 +1,8 @@
 import SwiftUI
-import NextSetCore
+import DamSetCore
 
 @main
-struct NextSetApp: App {
+struct DamSetApp: App {
     var body: some Scene {
         WindowGroup {
             RoutineListView(viewModel: WorkoutViewModel())

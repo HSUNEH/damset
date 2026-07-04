@@ -4,7 +4,7 @@ import ActivityKit
 #endif
 
 #if os(iOS) && canImport(ActivityKit)
-public struct NextSetActivityAttributes: ActivityAttributes {
+public struct DamSetActivityAttributes: ActivityAttributes {
     public struct ContentState: Codable, Hashable {
         public var exerciseName: String
         public var currentSetIndex: Int
@@ -55,7 +55,7 @@ public struct NextSetActivityAttributes: ActivityAttributes {
 /// and (re)schedule the rest-end cue. Off-iOS the Live Activity and cue calls
 /// compile to no-ops so the SwiftPM shell target can type-check callers.
 public enum WorkoutSessionSync {
-    public static let appGroupId = "group.com.hsuneh.nextset"
+    public static let appGroupId = "group.com.hsuneh.damset"
 
     public static func makeSessionStore() -> ActiveSessionStore {
         ActiveSessionStore(appGroupId: appGroupId)
@@ -70,12 +70,12 @@ public enum WorkoutSessionSync {
     public static func startLiveActivity(for session: WorkoutRoutineSession) {
         #if os(iOS) && canImport(ActivityKit)
         guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
-        let content = ActivityContent(state: NextSetActivityAttributes.ContentState(session.lockScreenState), staleDate: nil)
-        if let existing = Activity<NextSetActivityAttributes>.activities.first(where: { $0.attributes.sessionId == session.sessionId }) {
+        let content = ActivityContent(state: DamSetActivityAttributes.ContentState(session.lockScreenState), staleDate: nil)
+        if let existing = Activity<DamSetActivityAttributes>.activities.first(where: { $0.attributes.sessionId == session.sessionId }) {
             Task { await existing.update(content) }
             return
         }
-        let attributes = NextSetActivityAttributes(sessionId: session.sessionId, routineName: session.routineName)
+        let attributes = DamSetActivityAttributes(sessionId: session.sessionId, routineName: session.routineName)
         _ = try? Activity.request(attributes: attributes, content: content, pushType: nil)
         #endif
     }
@@ -84,8 +84,8 @@ public enum WorkoutSessionSync {
     /// activity when the session is finished.
     public static func updateLiveActivity(for session: WorkoutRoutineSession) async {
         #if os(iOS) && canImport(ActivityKit)
-        let content = ActivityContent(state: NextSetActivityAttributes.ContentState(session.lockScreenState), staleDate: nil)
-        for activity in Activity<NextSetActivityAttributes>.activities where activity.attributes.sessionId == session.sessionId {
+        let content = ActivityContent(state: DamSetActivityAttributes.ContentState(session.lockScreenState), staleDate: nil)
+        for activity in Activity<DamSetActivityAttributes>.activities where activity.attributes.sessionId == session.sessionId {
             if session.sessionStatus == .completed || session.sessionStatus == .cancelled {
                 await activity.end(content, dismissalPolicy: .default)
             } else {
@@ -97,7 +97,7 @@ public enum WorkoutSessionSync {
 
     public static func endAllLiveActivities() async {
         #if os(iOS) && canImport(ActivityKit)
-        for activity in Activity<NextSetActivityAttributes>.activities {
+        for activity in Activity<DamSetActivityAttributes>.activities {
             await activity.end(activity.content, dismissalPolicy: .immediate)
         }
         #endif

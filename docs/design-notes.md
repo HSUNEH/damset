@@ -1,4 +1,4 @@
-# NextSet design notes
+# DamSet design notes
 
 ## Apple design source
 
@@ -15,7 +15,7 @@ The relevant Apple framing for this MVP:
 
 ## Product design direction
 
-NextSet should feel like a focused Apple fitness/timer utility:
+DamSet should feel like a focused Apple fitness/timer utility:
 
 - **Calm dark workout surface** while training, so bright gym environments and Lock Screen use remain readable.
 - **Large rounded numeric typography** for target reps, actual reps, rest timers, and set progress.
@@ -28,7 +28,7 @@ NextSet should feel like a focused Apple fitness/timer utility:
 
 Implemented in the app shell:
 
-- `NextSetDesign.swift` centralizes the MVP visual language:
+- `DamSetDesign.swift` centralizes the MVP visual language:
   - dark blue/black app gradient
   - Apple-blue accent
   - mint/orange supporting accents
@@ -86,7 +86,7 @@ Excluded from Live Activity MVP:
 Target behavior:
 
 1. Start workout music in another app.
-2. Complete a set in NextSet.
+2. Complete a set in DamSet.
 3. When rest has 3 seconds left, the cue sequence should be audible as `3, 2, 1, horn`.
 4. Music playback should remain playing after the full cue sequence.
 

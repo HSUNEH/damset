@@ -1,7 +1,7 @@
 #if os(iOS) && canImport(AppIntents) && canImport(ActivityKit)
 import AppIntents
 import Foundation
-import NextSetCore
+import DamSetCore
 
 /// Shared body for Live Activity actions. `LiveActivityIntent` runs perform()
 /// in the app process, so the App Group session file, the Live Activity, and

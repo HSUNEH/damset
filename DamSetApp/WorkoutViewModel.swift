@@ -1,6 +1,6 @@
 import Foundation
 import Observation
-import NextSetCore
+import DamSetCore
 
 @MainActor
 @Observable
@@ -72,10 +72,10 @@ final class WorkoutViewModel {
         }
     }
 
-    func advanceToNextSet() {
+    func advanceToDamSet() {
         guard var session = activeSession else { return }
         do {
-            try engine.advanceToNextSet(session: &session)
+            try engine.advanceToDamSet(session: &session)
             activeSession = session
             actualWeight = session.currentPlannedSet?.targetWeight ?? actualWeight
             cuePlayer.reset()

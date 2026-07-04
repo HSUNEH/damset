@@ -1,6 +1,6 @@
-# NextSet QA automation plan
+# DamSet QA automation plan
 
-NextSet needs more than unit tests because the core product value lives on the iPhone Lock Screen: Live Activity controls, rest timers, haptics/audio, and interaction while music is playing.
+DamSet needs more than unit tests because the core product value lives on the iPhone Lock Screen: Live Activity controls, rest timers, haptics/audio, and interaction while music is playing.
 
 ## QA layers
 
@@ -12,7 +12,7 @@ Current local gate:
 
 ```bash
 swift build
-swift run NextSetCoreSmoke
+swift run DamSetCoreSmoke
 ruby -e 'require "yaml"; YAML.load_file("seed.yaml"); puts "seed yaml ok"'
 git diff --check
 ```
@@ -29,7 +29,7 @@ Covers:
 
 ### 1.5 macOS app-shell UI automation (no Xcode required)
 
-The SwiftPM `NextSetAppShell` executable runs the real SwiftUI views on macOS
+The SwiftPM `DamSetAppShell` executable runs the real SwiftUI views on macOS
 (iOS-only chrome falls back: full-screen cover → sheet; Live Activity,
 notifications, and audio cues are no-ops). Drive it with Accessibility
 (`osascript` System Events element clicks — AXPress works without stealing
@@ -49,7 +49,7 @@ focus) and verify with per-window screenshots (`screencapture -l <windowID>`).
 - History row appeared immediately; detail screen showed per-set weight×reps
   rows, total sets/volume, started/ended times.
 - Summary JSON persisted to
-  `~/Library/Group Containers/group.com.hsuneh.nextset/workout-summaries.json`
+  `~/Library/Group Containers/group.com.hsuneh.damset/workout-summaries.json`
   (ISO-8601 dates); the active-session file was cleared on completion.
 - Kill + relaunch → History still listed (persistence across restart).
 
@@ -72,8 +72,8 @@ xcodebuild -version
 Then add/run gates:
 
 ```bash
-xcodebuild -scheme NextSet -destination 'platform=iOS Simulator,name=iPhone 16' build
-xcodebuild -scheme NextSet -destination 'platform=iOS Simulator,name=iPhone 16' test
+xcodebuild -scheme DamSet -destination 'platform=iOS Simulator,name=iPhone 16' build
+xcodebuild -scheme DamSet -destination 'platform=iOS Simulator,name=iPhone 16' test
 ```
 
 Purpose:
@@ -187,7 +187,7 @@ Preferred options:
 
 Run on real iPhone:
 
-1. Install and launch NextSet.
+1. Install and launch DamSet.
 2. Start music playback in Music/Spotify/YouTube Music.
 3. Start a default routine.
 4. Lock iPhone.

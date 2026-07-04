@@ -38,7 +38,7 @@ public final class FileWorkoutStore: LocalWorkoutStore, @unchecked Sendable {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? FileManager.default.temporaryDirectory
         let url = base
-            .appendingPathComponent("NextSet", isDirectory: true)
+            .appendingPathComponent("DamSet", isDirectory: true)
             .appendingPathComponent("workout-summaries.json")
         self.init(fileURL: url)
     }

@@ -1,4 +1,4 @@
-# NextSet install guide
+# DamSet install guide
 
 ## Current state
 
@@ -40,11 +40,11 @@ After full Xcode is selected:
 
 ```bash
 cd <repo root>
-xcodebuild -project NextSet.xcodeproj -scheme NextSet -showdestinations
-xcodebuild -project NextSet.xcodeproj -scheme NextSet -destination 'platform=iOS Simulator,name=iPhone 16' build
+xcodebuild -project DamSet.xcodeproj -scheme DamSet -showdestinations
+xcodebuild -project DamSet.xcodeproj -scheme DamSet -destination 'platform=iOS Simulator,name=iPhone 16' build
 ```
 
-Then open `NextSet.xcodeproj` in Xcode, pick an iPhone simulator, and press Run.
+Then open `DamSet.xcodeproj` in Xcode, pick an iPhone simulator, and press Run.
 
 ## Real iPhone install/run
 
@@ -65,8 +65,8 @@ xcrun devicectl list devices
 
 Build/install through Xcode:
 
-1. Open `NextSet.xcodeproj`.
-2. Select target `NextSet`.
+1. Open `DamSet.xcodeproj`.
+2. Select target `DamSet`.
 3. Signing & Capabilities → Team → choose ST/HSUNEH Apple team.
 4. Select the connected iPhone as destination.
 5. Press Run.
@@ -82,7 +82,7 @@ the current verification):
    very likely refused. Resolving this needs Xcode 26.5+, which needs
    macOS 26.2+ (this Mac is Sequoia 15.7).
 2. **Free/personal Apple team cannot create App Groups.** The app↔Live
-   Activity extension share state via `group.com.hsuneh.nextset`; signing the
+   Activity extension share state via `group.com.hsuneh.damset`; signing the
    full app with a personal team fails on that entitlement. A paid Apple
    Developer Program membership — or a stripped app-only build (drop the
    extension + App Group, fall back to app-local storage) — is required.
@@ -101,16 +101,16 @@ Note: `Xcode 26.3` was signed into with Apple ID `iamsuntae@gmail.com`
 ### App Group signing note
 
 The app and the Live Activity extension share state through the
-`group.com.hsuneh.nextset` App Group (both targets carry generated
+`group.com.hsuneh.damset` App Group (both targets carry generated
 `.entitlements` files). With automatic signing, Xcode registers the group on
 the selected team the first time you build. If the chosen team cannot register
 that identifier, change the group id in both entitlement blocks in
 `project.yml` **and** in `WorkoutSessionSync.appGroupId`
-(`Sources/NextSetCore/LiveActivitySupport.swift`), then regenerate the project.
+(`Sources/DamSetCore/LiveActivitySupport.swift`), then regenerate the project.
 
 ## First QA after install
 
-1. Launch NextSet.
+1. Launch DamSet.
 2. Pick a default routine; accept the notification permission prompt (rest cues).
 3. Verify active workout screen shows exercise, set index, target weight/reps, actual reps `- / +`, weight `±2.5`, and Set Done.
 4. Tap `- / +` and verify actual reps change.
@@ -121,7 +121,7 @@ that identifier, change the group id in both entitlement blocks in
 
 ## Notes
 
-- `NextSet.xcodeproj` was generated from `project.yml` using XcodeGen.
+- `DamSet.xcodeproj` was generated from `project.yml` using XcodeGen.
 - XcodeGen is installed locally at `~/.local/bin/xcodegen` (release binary; Homebrew unavailable on this machine).
 - Regenerate after editing `project.yml`:
 
@@ -133,7 +133,7 @@ that identifier, change the group id in both entitlement blocks in
 
 ```bash
 swift build
-swift run NextSetCoreSmoke
+swift run DamSetCoreSmoke
 ruby -e 'require "yaml"; YAML.load_file("seed.yaml"); puts "seed yaml ok"'
 git diff --check
 ```

@@ -1,5 +1,5 @@
 import Foundation
-import NextSetCore
+import DamSetCore
 
 func expect(_ condition: @autoclosure () -> Bool, _ message: String) {
     if !condition() {
@@ -30,8 +30,8 @@ expect(session.lockScreenState.resumeAt != nil, "resting state has resumeAt")
 if let resumeAt = session.lockScreenState.resumeAt {
     engine.updateRest(session: &session, now: resumeAt)
 }
-expect(session.lockScreenState.phase == .readyForNextSet, "rest reaches ready state")
-try engine.advanceToNextSet(session: &session)
+expect(session.lockScreenState.phase == .readyForDamSet, "rest reaches ready state")
+try engine.advanceToDamSet(session: &session)
 expect(session.currentSetIndex == 2, "advance moves to second set")
 expect(session.lockScreenState.phase == .performingSet, "next set returns to performing")
 
@@ -57,11 +57,11 @@ if let resumeAt = session.lockScreenState.resumeAt {
     expect(session.lockScreenState.phase == .resting, "still resting mid-countdown")
     engine.updateRest(session: &session, now: resumeAt)
 }
-try engine.advanceToNextSet(session: &session)
+try engine.advanceToDamSet(session: &session)
 
 // Finish the remaining sets and verify the summary invariants.
 try engine.completeCurrentSet(session: &session, now: Date(timeIntervalSince1970: 30))
-try engine.advanceToNextSet(session: &session)
+try engine.advanceToDamSet(session: &session)
 try engine.completeCurrentSet(session: &session, now: Date(timeIntervalSince1970: 40))
 expect(session.sessionStatus == .completed, "final set completes the session")
 expect(session.workoutEndTime == Date(timeIntervalSince1970: 40), "completion stamps workoutEndTime")
@@ -74,7 +74,7 @@ expect(summary.totalVolume == expectedVolume, "totalVolume equals weight*reps su
 
 // File store round-trip: a fresh instance on the same file must return the saved record.
 let storeURL = FileManager.default.temporaryDirectory
-    .appendingPathComponent("nextset-smoke-\(UUID().uuidString).json")
+    .appendingPathComponent("damset-smoke-\(UUID().uuidString).json")
 let store = FileWorkoutStore(fileURL: storeURL)
 try store.save(summary)
 let reloaded = FileWorkoutStore(fileURL: storeURL)
@@ -97,7 +97,7 @@ expect(refreshSession.lockScreenState.phase == .performingSet, "refresh lands on
 
 // Active session store round-trip used for app <-> Live Activity intent sharing.
 let sessionURL = FileManager.default.temporaryDirectory
-    .appendingPathComponent("nextset-smoke-session-\(UUID().uuidString).json")
+    .appendingPathComponent("damset-smoke-session-\(UUID().uuidString).json")
 let sessionStore = ActiveSessionStore(fileURL: sessionURL)
 try sessionStore.save(refreshSession)
 let loadedSession = try ActiveSessionStore(fileURL: sessionURL).load()
@@ -106,4 +106,4 @@ try sessionStore.clear()
 let clearedSession = try ActiveSessionStore(fileURL: sessionURL).load()
 expect(clearedSession == nil, "clear removes the shared session")
 
-print("NextSetCoreSmoke ok")
+print("DamSetCoreSmoke ok")

@@ -1,5 +1,5 @@
 import SwiftUI
-import NextSetCore
+import DamSetCore
 
 struct RoutineSetupView: View {
     let routine: RoutineTemplate
@@ -25,7 +25,7 @@ struct RoutineSetupView: View {
             .padding(.top, 18)
             .padding(.bottom, 108)
         }
-        .background(NextSetDesign.appGradient.ignoresSafeArea())
+        .background(DamSetDesign.appGradient.ignoresSafeArea())
         .safeAreaInset(edge: .bottom) {
             startButton
                 .padding(.horizontal, 20)
@@ -44,7 +44,7 @@ struct RoutineSetupView: View {
                 }
             }
         }
-        .tint(NextSetDesign.accent)
+        .tint(DamSetDesign.accent)
     }
 
     private var headerCard: some View {

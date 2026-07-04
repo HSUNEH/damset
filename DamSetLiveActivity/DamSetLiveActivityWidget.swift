@@ -2,18 +2,18 @@
 import ActivityKit
 import SwiftUI
 import WidgetKit
-import NextSetCore
+import DamSetCore
 
 @main
-struct NextSetWidgetBundle: WidgetBundle {
+struct DamSetWidgetBundle: WidgetBundle {
     var body: some Widget {
-        NextSetLiveActivityWidget()
+        DamSetLiveActivityWidget()
     }
 }
 
-struct NextSetLiveActivityWidget: Widget {
+struct DamSetLiveActivityWidget: Widget {
     var body: some WidgetConfiguration {
-        ActivityConfiguration(for: NextSetActivityAttributes.self) { context in
+        ActivityConfiguration(for: DamSetActivityAttributes.self) { context in
             lockScreenView(context: context)
                 .activityBackgroundTint(.black)
                 .activitySystemActionForegroundColor(.white)
@@ -60,11 +60,11 @@ struct NextSetLiveActivityWidget: Widget {
         }
     }
 
-    private func isResting(_ state: NextSetActivityAttributes.ContentState) -> Bool {
-        state.phase == LockScreenPhase.resting.rawValue || state.phase == LockScreenPhase.readyForNextSet.rawValue
+    private func isResting(_ state: DamSetActivityAttributes.ContentState) -> Bool {
+        state.phase == LockScreenPhase.resting.rawValue || state.phase == LockScreenPhase.readyForDamSet.rawValue
     }
 
-    private func lockScreenView(context: ActivityViewContext<NextSetActivityAttributes>) -> some View {
+    private func lockScreenView(context: ActivityViewContext<DamSetActivityAttributes>) -> some View {
         VStack(spacing: 12) {
             HStack(spacing: 10) {
                 Image(systemName: "figure.strengthtraining.traditional")
@@ -111,7 +111,7 @@ struct NextSetLiveActivityWidget: Widget {
         .padding()
     }
 
-    private func compactControls(context: ActivityViewContext<NextSetActivityAttributes>) -> some View {
+    private func compactControls(context: ActivityViewContext<DamSetActivityAttributes>) -> some View {
         HStack(spacing: 16) {
             Button(intent: AdjustRepsIntent(delta: -1)) {
                 Image(systemName: "minus.circle.fill")
@@ -146,10 +146,10 @@ struct NextSetLiveActivityWidget: Widget {
         }
     }
 
-    private func phasePill(_ state: NextSetActivityAttributes.ContentState) -> some View {
+    private func phasePill(_ state: DamSetActivityAttributes.ContentState) -> some View {
         let text: String
         let color: Color
-        if state.phase == LockScreenPhase.resting.rawValue || state.phase == LockScreenPhase.readyForNextSet.rawValue {
+        if state.phase == LockScreenPhase.resting.rawValue || state.phase == LockScreenPhase.readyForDamSet.rawValue {
             text = "REST"
             color = .orange
         } else if state.phase == LockScreenPhase.completed.rawValue {

@@ -1,7 +1,7 @@
 import SwiftUI
-import NextSetCore
+import DamSetCore
 
-enum NextSetDesign {
+enum DamSetDesign {
     static let accent = Color(red: 0.20, green: 0.48, blue: 1.0)
     static let mint = Color(red: 0.24, green: 0.78, blue: 0.63)
     static let orange = Color(red: 1.0, green: 0.58, blue: 0.22)

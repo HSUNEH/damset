@@ -1,5 +1,5 @@
 import SwiftUI
-import NextSetCore
+import DamSetCore
 
 struct RoutineListView: View {
     @State var viewModel: WorkoutViewModel
@@ -19,8 +19,8 @@ struct RoutineListView: View {
                 .padding(.top, 12)
                 .padding(.bottom, 28)
             }
-            .background(NextSetDesign.appGradient.ignoresSafeArea())
-            .navigationTitle("NextSet")
+            .background(DamSetDesign.appGradient.ignoresSafeArea())
+            .navigationTitle("DamSet")
             .inlineNavigationTitle()
             .workoutSessionCover(item: Binding(get: { viewModel.activeSession }, set: { viewModel.activeSession = $0 })) { _ in
                 ActiveWorkoutView(viewModel: viewModel)
@@ -31,14 +31,14 @@ struct RoutineListView: View {
                 }
             }
         }
-        .tint(NextSetDesign.accent)
+        .tint(DamSetDesign.accent)
     }
 
     private var heroHeader: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("NextSet")
+                    Text("DamSet")
                         .font(.system(size: 42, weight: .bold, design: .rounded))
                         .foregroundStyle(.white)
                     Text("Pick a routine, then keep your phone locked while the set and rest flow stays live.")
@@ -51,7 +51,7 @@ struct RoutineListView: View {
                     .font(.system(size: 28, weight: .semibold))
                     .foregroundStyle(.white)
                     .frame(width: 56, height: 56)
-                    .background(NextSetDesign.activeGradient, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .background(DamSetDesign.activeGradient, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
             }
 
             HStack(spacing: 10) {
@@ -134,11 +134,11 @@ private struct RoutineCard: View {
 
     var body: some View {
         HStack(spacing: 16) {
-            Image(systemName: NextSetDesign.routineSymbol(for: routine))
+            Image(systemName: DamSetDesign.routineSymbol(for: routine))
                 .font(.system(size: 24, weight: .semibold))
                 .foregroundStyle(.white)
                 .frame(width: 58, height: 58)
-                .background(NextSetDesign.routineTint(for: routine).gradient, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                .background(DamSetDesign.routineTint(for: routine).gradient, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
 
             VStack(alignment: .leading, spacing: 6) {
                 Text(routine.routineName)
@@ -159,7 +159,7 @@ private struct RoutineCard: View {
                 Text("Setup")
                     .font(.caption2.weight(.semibold))
             }
-            .foregroundStyle(NextSetDesign.routineTint(for: routine))
+            .foregroundStyle(DamSetDesign.routineTint(for: routine))
         }
         .nextSetCard(cornerRadius: 26)
     }

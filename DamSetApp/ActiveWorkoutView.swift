@@ -1,6 +1,6 @@
 import SwiftUI
 import Combine
-import NextSetCore
+import DamSetCore
 
 struct ActiveWorkoutView: View {
     @Bindable var viewModel: WorkoutViewModel
@@ -16,7 +16,7 @@ struct ActiveWorkoutView: View {
                     ContentUnavailableView("No active workout", systemImage: "figure.strengthtraining.traditional")
                 }
             }
-            .background(NextSetDesign.appGradient.ignoresSafeArea())
+            .background(DamSetDesign.appGradient.ignoresSafeArea())
             .inlineNavigationTitle()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -42,7 +42,7 @@ struct ActiveWorkoutView: View {
                 Button("Keep Going", role: .cancel) {}
             }
         }
-        .tint(NextSetDesign.accent)
+        .tint(DamSetDesign.accent)
         .onReceive(restTimer) { now in
             viewModel.tick(now: now)
         }
@@ -59,7 +59,7 @@ struct ActiveWorkoutView: View {
                 if session.lockScreenState.phase == .performingSet {
                     weightCard(session)
                     setDoneButton
-                } else if session.lockScreenState.phase == .resting || session.lockScreenState.phase == .readyForNextSet {
+                } else if session.lockScreenState.phase == .resting || session.lockScreenState.phase == .readyForDamSet {
                     restCard(session.lockScreenState)
                 } else if session.lockScreenState.phase == .completed {
                     completionCard
@@ -95,7 +95,7 @@ struct ActiveWorkoutView: View {
             }
 
             ProgressView(value: progress(for: session))
-                .tint(NextSetDesign.mint)
+                .tint(DamSetDesign.mint)
                 .accessibilityLabel("Workout progress")
         }
         .nextSetCard(cornerRadius: 30)
@@ -108,7 +108,7 @@ struct ActiveWorkoutView: View {
                 value: "\(session.completedSets.count)",
                 caption: "sets",
                 symbol: "checkmark.circle.fill",
-                color: NextSetDesign.mint
+                color: DamSetDesign.mint
             )
 
             Divider()
@@ -251,7 +251,7 @@ struct ActiveWorkoutView: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
-            Button("Next Set") { viewModel.advanceToNextSet() }
+            Button("Next Set") { viewModel.advanceToDamSet() }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
                 .frame(minHeight: 48)
@@ -291,7 +291,7 @@ struct ActiveWorkoutView: View {
         switch state.phase {
         case .performingSet:
             return "Set \(state.currentSetIndex)"
-        case .resting, .readyForNextSet:
+        case .resting, .readyForDamSet:
             return format(seconds: state.restRemainingSeconds)
         case .completed:
             return "Done"
@@ -304,7 +304,7 @@ struct ActiveWorkoutView: View {
             return "working"
         case .resting:
             return "left"
-        case .readyForNextSet:
+        case .readyForDamSet:
             return "ready"
         case .completed:
             return "saved"
@@ -317,7 +317,7 @@ struct ActiveWorkoutView: View {
             return "figure.strengthtraining.traditional"
         case .resting:
             return "timer"
-        case .readyForNextSet:
+        case .readyForDamSet:
             return "bell.and.waves.left.and.right.fill"
         case .completed:
             return "checkmark.seal.fill"
@@ -327,11 +327,11 @@ struct ActiveWorkoutView: View {
     private func phaseColor(for phase: LockScreenPhase) -> Color {
         switch phase {
         case .performingSet:
-            return NextSetDesign.accent
+            return DamSetDesign.accent
         case .resting:
-            return NextSetDesign.orange
-        case .readyForNextSet:
-            return NextSetDesign.mint
+            return DamSetDesign.orange
+        case .readyForDamSet:
+            return DamSetDesign.mint
         case .completed:
             return .green
         }
@@ -398,7 +398,7 @@ private struct CircleControl: View {
             Image(systemName: symbol)
                 .font(.title.bold())
                 .frame(width: 58, height: 58)
-                .background(NextSetDesign.activeGradient, in: Circle())
+                .background(DamSetDesign.activeGradient, in: Circle())
                 .foregroundStyle(.white)
         }
         .buttonStyle(.plain)

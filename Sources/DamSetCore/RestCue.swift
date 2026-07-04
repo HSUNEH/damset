@@ -15,10 +15,10 @@ import UIKit
 /// notification sound + vibration is always available.
 public enum RestCueScheduler {
     public static let cueIdentifiers = [
-        "nextset.restcue.3",
-        "nextset.restcue.2",
-        "nextset.restcue.1",
-        "nextset.restcue.horn"
+        "damset.restcue.3",
+        "damset.restcue.2",
+        "damset.restcue.1",
+        "damset.restcue.horn"
     ]
 
     /// UNUserNotificationCenter traps in processes without a bundle identifier
