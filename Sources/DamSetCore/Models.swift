@@ -111,12 +111,14 @@ public struct LockScreenState: Codable, Equatable, Sendable {
     public var totalPlannedSets: Int
     public var targetReps: Int
     public var actualReps: Int
-    public var canDecrementReps: Bool
-    public var canIncrementReps: Bool
     public var canCompleteSet: Bool
     public var restRemainingSeconds: Int
     public var resumeAt: Date?
     public var phase: LockScreenPhase
+
+    // Derived, so they can never drift out of sync with actualReps.
+    public var canDecrementReps: Bool { actualReps > 0 }
+    public var canIncrementReps: Bool { true }
 
     public init(
         exerciseName: String,
@@ -134,12 +136,52 @@ public struct LockScreenState: Codable, Equatable, Sendable {
         self.totalPlannedSets = max(1, totalPlannedSets)
         self.targetReps = max(0, targetReps)
         self.actualReps = max(0, actualReps)
-        self.canDecrementReps = actualReps > 0
-        self.canIncrementReps = true
         self.canCompleteSet = canCompleteSet
         self.restRemainingSeconds = max(0, restRemainingSeconds)
         self.resumeAt = resumeAt
         self.phase = phase
+    }
+
+    public static func performing(_ set: PlannedSet, setIndex: Int, totalSets: Int) -> LockScreenState {
+        LockScreenState(
+            exerciseName: set.exerciseName,
+            currentSetIndex: setIndex,
+            totalPlannedSets: totalSets,
+            targetReps: set.targetReps,
+            actualReps: set.targetReps,
+            canCompleteSet: true,
+            restRemainingSeconds: 0,
+            resumeAt: nil,
+            phase: .performingSet
+        )
+    }
+
+    public static func resting(after set: PlannedSet, setIndex: Int, totalSets: Int, actualReps: Int, resumeAt: Date) -> LockScreenState {
+        LockScreenState(
+            exerciseName: set.exerciseName,
+            currentSetIndex: setIndex,
+            totalPlannedSets: totalSets,
+            targetReps: set.targetReps,
+            actualReps: actualReps,
+            canCompleteSet: false,
+            restRemainingSeconds: set.restDurationSeconds,
+            resumeAt: resumeAt,
+            phase: .resting
+        )
+    }
+
+    public static func completed(after set: PlannedSet, setIndex: Int, totalSets: Int, actualReps: Int) -> LockScreenState {
+        LockScreenState(
+            exerciseName: set.exerciseName,
+            currentSetIndex: setIndex,
+            totalPlannedSets: totalSets,
+            targetReps: set.targetReps,
+            actualReps: actualReps,
+            canCompleteSet: false,
+            restRemainingSeconds: 0,
+            resumeAt: nil,
+            phase: .completed
+        )
     }
 }
 

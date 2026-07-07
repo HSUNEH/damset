@@ -16,17 +16,7 @@ public struct WorkoutEngine: Sendable {
 
     public func startSession(routine: RoutineTemplate, now: Date = Date(), sessionId: String = UUID().uuidString) throws -> WorkoutRoutineSession {
         guard let firstSet = routine.plannedSets.first else { throw WorkoutEngineError.routineHasNoSets }
-        let lockState = LockScreenState(
-            exerciseName: firstSet.exerciseName,
-            currentSetIndex: 1,
-            totalPlannedSets: routine.plannedSets.count,
-            targetReps: firstSet.targetReps,
-            actualReps: firstSet.targetReps,
-            canCompleteSet: true,
-            restRemainingSeconds: 0,
-            resumeAt: nil,
-            phase: .performingSet
-        )
+        let lockState = LockScreenState.performing(firstSet, setIndex: 1, totalSets: routine.plannedSets.count)
         return WorkoutRoutineSession(
             sessionId: sessionId,
             routineId: routine.routineId,
@@ -44,10 +34,7 @@ public struct WorkoutEngine: Sendable {
 
     public func adjustActualReps(session: inout WorkoutRoutineSession, delta: Int) throws {
         guard session.sessionStatus != .completed else { throw WorkoutEngineError.sessionAlreadyCompleted }
-        let next = max(0, session.lockScreenState.actualReps + delta)
-        session.lockScreenState.actualReps = next
-        session.lockScreenState.canDecrementReps = next > 0
-        session.lockScreenState.canIncrementReps = true
+        session.lockScreenState.actualReps = max(0, session.lockScreenState.actualReps + delta)
     }
 
     /// Completes the current set. `actualWeight` overrides the recorded weight when the user
@@ -68,32 +55,22 @@ public struct WorkoutEngine: Sendable {
         if session.currentSetIndex >= session.plannedSets.count {
             session.sessionStatus = .completed
             session.workoutEndTime = now
-            session.lockScreenState = LockScreenState(
-                exerciseName: planned.exerciseName,
-                currentSetIndex: session.currentSetIndex,
-                totalPlannedSets: session.plannedSets.count,
-                targetReps: planned.targetReps,
-                actualReps: completed.actualReps,
-                canCompleteSet: false,
-                restRemainingSeconds: 0,
-                resumeAt: nil,
-                phase: .completed
+            session.lockScreenState = .completed(
+                after: planned,
+                setIndex: session.currentSetIndex,
+                totalSets: session.plannedSets.count,
+                actualReps: completed.actualReps
             )
             return
         }
 
-        let resumeAt = now.addingTimeInterval(TimeInterval(planned.restDurationSeconds))
         session.sessionStatus = .resting
-        session.lockScreenState = LockScreenState(
-            exerciseName: planned.exerciseName,
-            currentSetIndex: session.currentSetIndex,
-            totalPlannedSets: session.plannedSets.count,
-            targetReps: planned.targetReps,
+        session.lockScreenState = .resting(
+            after: planned,
+            setIndex: session.currentSetIndex,
+            totalSets: session.plannedSets.count,
             actualReps: completed.actualReps,
-            canCompleteSet: false,
-            restRemainingSeconds: planned.restDurationSeconds,
-            resumeAt: resumeAt,
-            phase: .resting
+            resumeAt: now.addingTimeInterval(TimeInterval(planned.restDurationSeconds))
         )
     }
 
@@ -122,17 +99,7 @@ public struct WorkoutEngine: Sendable {
         let nextIndex = session.currentSetIndex + 1
         session.currentSetIndex = nextIndex
         session.sessionStatus = .active
-        session.lockScreenState = LockScreenState(
-            exerciseName: nextSet.exerciseName,
-            currentSetIndex: nextIndex,
-            totalPlannedSets: session.plannedSets.count,
-            targetReps: nextSet.targetReps,
-            actualReps: nextSet.targetReps,
-            canCompleteSet: true,
-            restRemainingSeconds: 0,
-            resumeAt: nil,
-            phase: .performingSet
-        )
+        session.lockScreenState = .performing(nextSet, setIndex: nextIndex, totalSets: session.plannedSets.count)
     }
 
     public func addSessionScopedSet(session: inout WorkoutRoutineSession, exerciseName: String, targetWeight: Double, targetReps: Int, restDurationSeconds: Int) {
