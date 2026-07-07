@@ -13,7 +13,7 @@ import DamSetCore
 /// during an active rest are ignored (mirrors LockScreenActionPolicy — only
 /// reps adjustment and set completion are allowed, and only while performing).
 private func performLockScreenAction(_ mutate: (WorkoutEngine, inout WorkoutRoutineSession) throws -> Void) async {
-    let store = WorkoutSessionSync.makeSessionStore()
+    let store = WorkoutSessionSync.sessionStore
     guard var session = (try? store.load()) ?? nil else { return }
     let engine = WorkoutEngine()
     engine.refresh(session: &session)

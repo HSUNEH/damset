@@ -7,7 +7,7 @@ import DamSetCore
 final class WorkoutViewModel {
     private let engine = WorkoutEngine()
     private let store: LocalWorkoutStore
-    private let sessionStore = WorkoutSessionSync.makeSessionStore()
+    private let sessionStore = WorkoutSessionSync.sessionStore
     private let cuePlayer = InAppRestCuePlayer()
     let catalog = RoutineCatalog()
     var activeSession: WorkoutRoutineSession?
@@ -16,7 +16,7 @@ final class WorkoutViewModel {
     var actualWeight: Double = 0
     var errorMessage: String?
 
-    init(store: LocalWorkoutStore = WorkoutSessionSync.makeSummaryStore()) {
+    init(store: LocalWorkoutStore = WorkoutSessionSync.summaryStore) {
         self.store = store
         reloadSummaries()
         adoptSharedSessionIfPresent()

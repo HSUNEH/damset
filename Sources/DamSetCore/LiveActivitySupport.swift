@@ -57,13 +57,11 @@ public struct DamSetActivityAttributes: ActivityAttributes {
 public enum WorkoutSessionSync {
     public static let appGroupId = "group.com.hsuneh.damset"
 
-    public static func makeSessionStore() -> ActiveSessionStore {
-        ActiveSessionStore(appGroupId: appGroupId)
-    }
-
-    public static func makeSummaryStore() -> FileWorkoutStore {
-        FileWorkoutStore(appGroupId: appGroupId)
-    }
+    /// Shared instances: each store serializes its read-modify-write cycles
+    /// with an instance-level lock, so every caller in the process must go
+    /// through the same instance for that lock to mean anything.
+    public static let sessionStore = ActiveSessionStore(appGroupId: appGroupId)
+    public static let summaryStore = FileWorkoutStore(appGroupId: appGroupId)
 
     /// Starts the Live Activity for a session, or adopts an existing one after
     /// an app relaunch.
@@ -109,14 +107,14 @@ public enum WorkoutSessionSync {
         switch session.sessionStatus {
         case .completed:
             let summary = WorkoutEngine().summarize(session: session, endedAt: session.workoutEndTime ?? Date())
-            try? makeSummaryStore().save(summary)
-            try? makeSessionStore().clear()
+            try? summaryStore.save(summary)
+            try? sessionStore.clear()
             RestCueScheduler.cancelPendingCues()
         case .cancelled:
-            try? makeSessionStore().clear()
+            try? sessionStore.clear()
             RestCueScheduler.cancelPendingCues()
         default:
-            try? makeSessionStore().save(session)
+            try? sessionStore.save(session)
             if session.sessionStatus == .resting,
                session.lockScreenState.phase == .resting,
                let resumeAt = session.lockScreenState.resumeAt {
