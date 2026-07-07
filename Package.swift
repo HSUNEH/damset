@@ -27,6 +27,11 @@ let package = Package(
             path: "DamSetApp",
             exclude: ["Info.plist", "DamSet.entitlements"]
         ),
-        .executableTarget(name: "DamSetCoreSmoke", dependencies: ["DamSetCore"])
+        .executableTarget(name: "DamSetCoreSmoke", dependencies: ["DamSetCore"]),
+        .testTarget(
+            name: "DamSetCoreTests",
+            dependencies: ["DamSetCore"],
+            path: "XcodeTests/DamSetCoreTests"
+        )
     ]
 )

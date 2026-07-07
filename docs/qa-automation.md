@@ -12,6 +12,7 @@ Current local gate:
 
 ```bash
 swift build
+swift test
 swift run DamSetCoreSmoke
 ruby -e 'require "yaml"; YAML.load_file("seed.yaml"); puts "seed yaml ok"'
 git diff --check
