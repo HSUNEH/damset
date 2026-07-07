@@ -69,9 +69,9 @@ struct DamSetLiveActivityWidget: Widget {
             HStack(spacing: 10) {
                 Image(systemName: "figure.strengthtraining.traditional")
                     .font(.headline)
-                    .foregroundStyle(.blue)
+                    .foregroundStyle(Color(red: 0.588, green: 0.408, blue: 0.247))
                     .frame(width: 34, height: 34)
-                    .background(.blue.opacity(0.18), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .background(Color(red: 0.588, green: 0.408, blue: 0.247).opacity(0.18), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                 VStack(alignment: .leading, spacing: 1) {
                     Text(context.state.exerciseName)
                         .font(.headline)
@@ -157,7 +157,7 @@ struct DamSetLiveActivityWidget: Widget {
             color = .green
         } else {
             text = "LIVE"
-            color = .blue
+            color = Color(red: 0.588, green: 0.408, blue: 0.247)
         }
         return Text(text)
             .font(.caption2.bold())

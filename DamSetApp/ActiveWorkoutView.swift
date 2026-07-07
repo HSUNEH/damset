@@ -16,7 +16,7 @@ struct ActiveWorkoutView: View {
                     ContentUnavailableView("No active workout", systemImage: "figure.strengthtraining.traditional")
                 }
             }
-            .background(DamSetDesign.appGradient.ignoresSafeArea())
+            .background(DamSetDesign.screenBackground.ignoresSafeArea())
             .inlineNavigationTitle()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -71,34 +71,33 @@ struct ActiveWorkoutView: View {
     }
 
     private func workoutHeader(_ session: WorkoutRoutineSession) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: 4) {
                     Text(session.routineName)
-                        .font(.caption.weight(.semibold))
-                        .textCase(.uppercase)
-                        .tracking(0.8)
-                        .foregroundStyle(.white.opacity(0.62))
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
                     Text(session.lockScreenState.exerciseName)
-                        .font(.system(size: 30, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white)
+                        .font(.title.bold())
+                        .foregroundStyle(.primary)
                         .lineLimit(2)
                         .minimumScaleFactor(0.75)
                 }
                 Spacer()
                 Text("Set \(session.lockScreenState.currentSetIndex)/\(session.lockScreenState.totalPlannedSets)")
-                    .font(.headline.monospacedDigit())
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 9)
-                    .background(.thinMaterial, in: Capsule())
-                    .foregroundStyle(.white)
+                    .font(.subheadline.weight(.semibold))
+                    .monospacedDigit()
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(DamSetDesign.accent.opacity(0.12), in: Capsule())
+                    .foregroundStyle(DamSetDesign.accent)
             }
 
             ProgressView(value: progress(for: session))
-                .tint(DamSetDesign.mint)
+                .tint(DamSetDesign.accent)
                 .accessibilityLabel("Workout progress")
         }
-        .cardSurface(cornerRadius: 30)
+        .cardSurface(cornerRadius: 20)
     }
 
     private func workoutFlowCard(_ session: WorkoutRoutineSession) -> some View {
@@ -108,11 +107,10 @@ struct ActiveWorkoutView: View {
                 value: "\(session.completedSets.count)",
                 caption: "sets",
                 symbol: "checkmark.circle.fill",
-                color: DamSetDesign.mint
+                color: DamSetDesign.moss
             )
 
             Divider()
-                .overlay(.white.opacity(0.12))
 
             FlowMetric(
                 title: session.lockScreenState.phase == .resting ? "Resting" : "Now",
@@ -123,39 +121,38 @@ struct ActiveWorkoutView: View {
             )
 
             Divider()
-                .overlay(.white.opacity(0.12))
 
             FlowMetric(
                 title: "Next",
                 value: session.nextPlannedSet?.exerciseName ?? "Done",
                 caption: nextSetCaption(for: session),
                 symbol: "forward.fill",
-                color: .white.opacity(0.82)
+                color: .secondary
             )
         }
         .frame(maxWidth: .infinity)
-        .cardSurface(cornerRadius: 26)
+        .cardSurface(cornerRadius: 20)
     }
 
     private func targetCard(_ session: WorkoutRoutineSession) -> some View {
         VStack(spacing: 4) {
-            Text("TARGET REPS")
-                .font(.caption2.weight(.semibold))
-                .tracking(1)
+            Text("Target reps")
+                .font(.footnote)
                 .foregroundStyle(.secondary)
             Text("\(session.lockScreenState.targetReps)")
-                .font(.system(size: 68, weight: .bold, design: .rounded))
+                .font(.system(size: 64, weight: .bold, design: .rounded))
+                .foregroundStyle(.primary)
                 .monospacedDigit()
                 .contentTransition(.numericText())
             if let planned = session.currentPlannedSet {
                 Text("\(planned.targetWeight.formatted()) kg × \(planned.targetReps) · \(planned.restDurationSeconds.minuteSecondText) rest")
-                    .font(.caption)
+                    .font(.footnote)
                     .foregroundStyle(.secondary)
                     .monospacedDigit()
             }
             if let last = session.completedSets.last {
                 Label("Last: \(last.exerciseName) · \(last.actualWeight.formatted()) kg × \(last.actualReps)", systemImage: "clock.arrow.circlepath")
-                    .font(.caption)
+                    .font(.footnote)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
@@ -163,23 +160,23 @@ struct ActiveWorkoutView: View {
             }
         }
         .frame(maxWidth: .infinity)
-        .cardSurface(cornerRadius: 30)
+        .cardSurface(cornerRadius: 20)
     }
 
     private func repsControl(_ session: WorkoutRoutineSession) -> some View {
-        HStack(spacing: 16) {
+        HStack(spacing: 20) {
             CircleControl(symbol: "minus", label: "Decrease reps") {
                 viewModel.adjustReps(-1)
             }
             .disabled(!session.lockScreenState.canDecrementReps)
 
-            VStack(spacing: 4) {
-                Text("DID")
-                    .font(.caption2.weight(.bold))
-                    .tracking(1)
+            VStack(spacing: 2) {
+                Text("Did")
+                    .font(.footnote)
                     .foregroundStyle(.secondary)
                 Text("\(session.lockScreenState.actualReps)")
-                    .font(.system(size: 42, weight: .semibold, design: .rounded))
+                    .font(.system(size: 40, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.primary)
                     .monospacedDigit()
                     .contentTransition(.numericText())
                     .accessibilityLabel("Actual reps")
@@ -191,27 +188,28 @@ struct ActiveWorkoutView: View {
             }
         }
         .frame(maxWidth: .infinity)
-        .cardSurface(cornerRadius: 30)
+        .cardSurface(cornerRadius: 20)
     }
 
     private func weightCard(_ session: WorkoutRoutineSession) -> some View {
-        HStack(spacing: 16) {
+        HStack(spacing: 12) {
             Button { viewModel.adjustWeight(-2.5) } label: {
                 Text("−2.5")
-                    .font(.headline.monospacedDigit())
-                    .frame(minWidth: 72, minHeight: 48)
+                    .font(.subheadline.weight(.semibold))
+                    .monospacedDigit()
+                    .frame(minWidth: 64, minHeight: 40)
             }
             .buttonStyle(.bordered)
             .disabled(viewModel.actualWeight <= 0)
             .accessibilityLabel("Decrease weight by 2.5 kilograms")
 
-            VStack(spacing: 3) {
-                Text("ACTUAL WEIGHT")
-                    .font(.caption2.weight(.bold))
-                    .tracking(0.8)
+            VStack(spacing: 2) {
+                Text("Actual weight")
+                    .font(.footnote)
                     .foregroundStyle(.secondary)
                 Text("\(viewModel.actualWeight.formatted()) kg")
-                    .font(.title2.weight(.semibold))
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(.primary)
                     .monospacedDigit()
                     .accessibilityLabel("Actual weight")
             }
@@ -219,31 +217,38 @@ struct ActiveWorkoutView: View {
 
             Button { viewModel.adjustWeight(2.5) } label: {
                 Text("+2.5")
-                    .font(.headline.monospacedDigit())
-                    .frame(minWidth: 72, minHeight: 48)
+                    .font(.subheadline.weight(.semibold))
+                    .monospacedDigit()
+                    .frame(minWidth: 64, minHeight: 40)
             }
             .buttonStyle(.bordered)
             .accessibilityLabel("Increase weight by 2.5 kilograms")
         }
-        .cardSurface(cornerRadius: 26)
+        .cardSurface(cornerRadius: 20)
     }
 
     private var setDoneButton: some View {
-        Button("Set Done") { viewModel.completeSet() }
-            .font(.title3.bold())
-            .frame(maxWidth: .infinity, minHeight: 58)
-            .buttonStyle(.borderedProminent)
-            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-            .accessibilityLabel("Complete current set")
+        Button {
+            viewModel.completeSet()
+        } label: {
+            Text("Set Done")
+                .font(.headline)
+                .frame(maxWidth: .infinity, minHeight: 40)
+        }
+        .buttonStyle(.borderedProminent)
+        .buttonBorderShape(.roundedRectangle(radius: 16))
+        .controlSize(.large)
+        .accessibilityLabel("Complete current set")
     }
 
     private func restCard(_ state: LockScreenState) -> some View {
-        VStack(spacing: 18) {
+        VStack(spacing: 14) {
             Label("Rest", systemImage: "timer")
-                .font(.headline)
+                .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.secondary)
             Text(state.restRemainingSeconds.minuteSecondText)
-                .font(.system(size: 64, weight: .bold, design: .rounded))
+                .font(.system(size: 60, weight: .bold, design: .rounded))
+                .foregroundStyle(.primary)
                 .monospacedDigit()
                 .contentTransition(.numericText())
             if let resumeAt = state.resumeAt {
@@ -252,21 +257,22 @@ struct ActiveWorkoutView: View {
                     .foregroundStyle(.secondary)
             }
             Text("Next set starts automatically when rest ends")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(DamSetDesign.mint)
+                .font(.footnote.weight(.medium))
+                .foregroundStyle(DamSetDesign.accent)
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
-        .cardSurface(cornerRadius: 30)
+        .cardSurface(cornerRadius: 20)
     }
 
     private var completionCard: some View {
         VStack(spacing: 14) {
             Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 54))
-                .foregroundStyle(.green)
+                .font(.system(size: 48))
+                .foregroundStyle(DamSetDesign.moss)
             Text("Workout complete")
                 .font(.title2.bold())
+                .foregroundStyle(.primary)
             if let summary = viewModel.lastSummary {
                 Text("\(summary.totalSets) sets · \(summary.totalVolume.formatted()) kg volume")
                     .font(.subheadline)
@@ -275,10 +281,11 @@ struct ActiveWorkoutView: View {
             }
             Button("Done") { viewModel.closeWorkout() }
                 .buttonStyle(.borderedProminent)
+                .buttonBorderShape(.roundedRectangle(radius: 14))
                 .controlSize(.large)
         }
         .frame(maxWidth: .infinity)
-        .cardSurface(cornerRadius: 30)
+        .cardSurface(cornerRadius: 20)
     }
 
     private func progress(for session: WorkoutRoutineSession) -> Double {
@@ -329,11 +336,11 @@ struct ActiveWorkoutView: View {
         case .performingSet:
             return DamSetDesign.accent
         case .resting:
-            return DamSetDesign.orange
+            return DamSetDesign.amber
         case .readyForNextSet:
-            return DamSetDesign.mint
+            return DamSetDesign.moss
         case .completed:
-            return .green
+            return DamSetDesign.moss
         }
     }
 
@@ -341,7 +348,6 @@ struct ActiveWorkoutView: View {
         guard let next = session.nextPlannedSet else { return "finish" }
         return "\(next.targetWeight.formatted()) kg × \(next.targetReps)"
     }
-
 }
 
 private struct FlowMetric: View {
@@ -352,17 +358,16 @@ private struct FlowMetric: View {
     let color: Color
 
     var body: some View {
-        VStack(spacing: 6) {
+        VStack(spacing: 5) {
             Image(systemName: symbol)
-                .font(.headline)
+                .font(.subheadline.weight(.semibold))
                 .foregroundStyle(color)
             Text(title)
-                .font(.caption2.weight(.semibold))
-                .textCase(.uppercase)
-                .tracking(0.5)
+                .font(.caption)
                 .foregroundStyle(.secondary)
             Text(value)
-                .font(.headline.weight(.bold))
+                .font(.subheadline.weight(.bold))
+                .foregroundStyle(.primary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.62)
                 .monospacedDigit()
@@ -385,10 +390,10 @@ private struct CircleControl: View {
     var body: some View {
         Button(action: action) {
             Image(systemName: symbol)
-                .font(.title.bold())
-                .frame(width: 58, height: 58)
-                .background(DamSetDesign.activeGradient, in: Circle())
-                .foregroundStyle(.white)
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(.primary)
+                .frame(width: 56, height: 56)
+                .background(DamSetDesign.controlFill, in: Circle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel(label)

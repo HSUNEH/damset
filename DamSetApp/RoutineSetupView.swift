@@ -17,21 +17,21 @@ struct RoutineSetupView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: 24) {
                 headerCard
                 setsEditor
             }
             .padding(.horizontal, 20)
-            .padding(.top, 18)
-            .padding(.bottom, 108)
+            .padding(.top, 12)
+            .padding(.bottom, 96)
         }
-        .background(DamSetDesign.appGradient.ignoresSafeArea())
+        .background(DamSetDesign.screenBackground.ignoresSafeArea())
         .safeAreaInset(edge: .bottom) {
             startButton
                 .padding(.horizontal, 20)
                 .padding(.top, 12)
                 .padding(.bottom, 10)
-                .background(.ultraThinMaterial)
+                .background(.bar)
         }
         .navigationTitle("Setup")
         .inlineNavigationTitle()
@@ -48,28 +48,19 @@ struct RoutineSetupView: View {
     }
 
     private var headerCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("TODAY'S PLAN")
-                .font(.caption.weight(.semibold))
-                .tracking(1)
-                .foregroundStyle(.white.opacity(0.64))
+        VStack(alignment: .leading, spacing: 6) {
             TextField("Routine name", text: $draftName)
-                .font(.system(size: 32, weight: .bold, design: .rounded))
-                .foregroundStyle(.white)
-            HStack(spacing: 10) {
-                MetricPill(title: "Sets", value: "\(draftSets.count)", symbol: "list.number")
-                MetricPill(title: "Rest", value: "\(totalRestMinutes)", symbol: "timer")
-            }
-            Text("Edit the set list first. Start only when today's workout matches what you want to do.")
-                .font(.callout)
-                .foregroundStyle(.white.opacity(0.72))
-                .fixedSize(horizontal: false, vertical: true)
+                .font(.title2.bold())
+                .foregroundStyle(.primary)
+            Text("\(draftSets.count) sets · \(totalRestMinutes) rest")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
         }
-        .cardSurface(cornerRadius: 32)
+        .cardSurface(cornerRadius: 20)
     }
 
     private var setsEditor: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 10) {
             SectionHeader(title: "Sets", subtitle: "Exercise · kg · reps · rest")
             ForEach($draftSets) { $set in
                 EditableSetCard(
@@ -82,11 +73,13 @@ struct RoutineSetupView: View {
             Button {
                 addSet()
             } label: {
-                Label("Add another set", systemImage: "plus.circle.fill")
-                    .frame(maxWidth: .infinity, minHeight: 48)
+                Label("Add set", systemImage: "plus")
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(DamSetDesign.accent)
+                    .frame(maxWidth: .infinity, minHeight: 52)
             }
-            .buttonStyle(.bordered)
-            .cardSurface(cornerRadius: 22)
+            .buttonStyle(.plain)
+            .background(DamSetDesign.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
     }
 
@@ -95,14 +88,13 @@ struct RoutineSetupView: View {
             viewModel.start(makeRoutine())
             dismiss()
         } label: {
-            HStack {
-                Image(systemName: "play.fill")
-                Text("Start Workout")
-            }
-            .font(.title3.bold())
-            .frame(maxWidth: .infinity, minHeight: 58)
+            Text("Start Workout")
+                .font(.headline)
+                .frame(maxWidth: .infinity, minHeight: 40)
         }
         .buttonStyle(.borderedProminent)
+        .buttonBorderShape(.roundedRectangle(radius: 16))
+        .controlSize(.large)
         .disabled(!canStart)
         .accessibilityLabel("Start workout with edited set plan")
     }
@@ -171,18 +163,22 @@ private struct EditableSetCard: View {
             HStack(alignment: .firstTextBaseline) {
                 TextField("Exercise", text: $set.exerciseName)
                     .font(.headline)
+                    .foregroundStyle(.primary)
                 Spacer()
                 Menu {
                     Button("Duplicate", systemImage: "plus.square.on.square") { duplicate() }
                     Button("Delete", systemImage: "trash", role: .destructive) { delete() }
                         .disabled(!canDelete)
                 } label: {
-                    Image(systemName: "ellipsis.circle.fill")
-                        .font(.title3)
+                    Image(systemName: "ellipsis")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 32, height: 32)
+                        .background(DamSetDesign.controlFill, in: Circle())
                 }
             }
 
-            HStack(spacing: 10) {
+            HStack(spacing: 8) {
                 StepperField(
                     title: "kg",
                     value: weightText,
@@ -203,7 +199,7 @@ private struct EditableSetCard: View {
                 )
             }
         }
-        .cardSurface(cornerRadius: 24)
+        .cardSurface(cornerRadius: 20)
     }
 
     private var weightText: String {
@@ -219,28 +215,33 @@ private struct StepperField: View {
 
     var body: some View {
         VStack(spacing: 8) {
-            Text(title.uppercased())
-                .font(.caption2.weight(.bold))
+            Text(title)
+                .font(.caption)
                 .foregroundStyle(.secondary)
             Text(value)
                 .font(.headline.monospacedDigit())
+                .foregroundStyle(.primary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
-            HStack(spacing: 8) {
-                Button(action: decrement) {
-                    Image(systemName: "minus")
-                        .frame(width: 28, height: 28)
-                }
-                Button(action: increment) {
-                    Image(systemName: "plus")
-                        .frame(width: 28, height: 28)
-                }
+            HStack(spacing: 6) {
+                stepButton(symbol: "minus", action: decrement)
+                stepButton(symbol: "plus", action: increment)
             }
-            .buttonStyle(.bordered)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 8)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .padding(.vertical, 10)
+        .background(DamSetDesign.controlFill, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+
+    private func stepButton(symbol: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.primary)
+                .frame(width: 34, height: 30)
+                .background(DamSetDesign.surface, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+        }
+        .buttonStyle(.plain)
     }
 }
 

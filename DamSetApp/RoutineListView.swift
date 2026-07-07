@@ -8,20 +8,18 @@ struct RoutineListView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
-                    heroHeader
+                VStack(alignment: .leading, spacing: 28) {
                     routineSection
                     if !viewModel.savedSummaries.isEmpty {
                         historySection
                     }
                 }
                 .padding(.horizontal, 20)
-                .padding(.top, 12)
+                .padding(.top, 8)
                 .padding(.bottom, 28)
             }
-            .background(DamSetDesign.appGradient.ignoresSafeArea())
+            .background(DamSetDesign.screenBackground.ignoresSafeArea())
             .navigationTitle("DamSet")
-            .inlineNavigationTitle()
             .workoutSessionCover(item: Binding(get: { viewModel.activeSession }, set: { viewModel.activeSession = $0 })) { _ in
                 ActiveWorkoutView(viewModel: viewModel)
             }
@@ -34,51 +32,25 @@ struct RoutineListView: View {
         .tint(DamSetDesign.accent)
     }
 
-    private var heroHeader: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("DamSet")
-                        .font(.system(size: 42, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white)
-                    Text("Pick a routine, then keep your phone locked while the set and rest flow stays live.")
-                        .font(.callout)
-                        .foregroundStyle(.white.opacity(0.72))
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                Spacer()
-                Image(systemName: "bolt.heart.fill")
-                    .font(.system(size: 28, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(width: 56, height: 56)
-                    .background(DamSetDesign.activeGradient, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-            }
-
-            HStack(spacing: 10) {
-                MetricPill(title: "Routines", value: "\(viewModel.catalog.routines.count)", symbol: "list.bullet.rectangle")
-                MetricPill(title: "Saved", value: "\(viewModel.savedSummaries.count)", symbol: "clock.arrow.circlepath")
-            }
-        }
-        .cardSurface(cornerRadius: 32)
-    }
-
     private var routineSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            SectionHeader(title: "Start workout", subtitle: "Apple-native controls, Lock Screen ready")
-            ForEach(viewModel.catalog.routines) { routine in
-                NavigationLink {
-                    RoutineSetupView(routine: routine, viewModel: viewModel)
-                } label: {
-                    RoutineCard(routine: routine)
+        VStack(alignment: .leading, spacing: 10) {
+            SectionHeader(title: "Routines")
+            VStack(spacing: 10) {
+                ForEach(viewModel.catalog.routines) { routine in
+                    NavigationLink {
+                        RoutineSetupView(routine: routine, viewModel: viewModel)
+                    } label: {
+                        RoutineRow(routine: routine)
+                    }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
             }
         }
     }
 
     private var historySection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            SectionHeader(title: "History", subtitle: "Recent completed sessions")
+        VStack(alignment: .leading, spacing: 10) {
+            SectionHeader(title: "History")
             VStack(spacing: 10) {
                 ForEach(viewModel.savedSummaries) { summary in
                     NavigationLink {
@@ -95,76 +67,52 @@ struct RoutineListView: View {
 
 struct SectionHeader: View {
     let title: String
-    let subtitle: String
+    var subtitle: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(title)
-                .font(.title2.bold())
-                .foregroundStyle(.white)
-            Text(subtitle)
-                .font(.subheadline)
-                .foregroundStyle(.white.opacity(0.62))
+                .font(.title3.bold())
+                .foregroundStyle(.primary)
+            if let subtitle {
+                Text(subtitle)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
         }
+        .padding(.horizontal, 4)
     }
 }
 
-struct MetricPill: View {
-    let title: String
-    let value: String
-    let symbol: String
-
-    var body: some View {
-        HStack(spacing: 8) {
-            Image(systemName: symbol)
-            Text(value).bold()
-            Text(title)
-                .foregroundStyle(.secondary)
-        }
-        .font(.caption)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(.thinMaterial, in: Capsule())
-        .foregroundStyle(.white)
-    }
-}
-
-private struct RoutineCard: View {
+private struct RoutineRow: View {
     let routine: RoutineTemplate
 
     var body: some View {
-        HStack(spacing: 16) {
+        HStack(spacing: 14) {
             Image(systemName: DamSetDesign.routineSymbol(for: routine))
-                .font(.system(size: 24, weight: .semibold))
-                .foregroundStyle(.white)
-                .frame(width: 58, height: 58)
-                .background(DamSetDesign.routineTint(for: routine).gradient, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                .font(.system(size: 19, weight: .semibold))
+                .foregroundStyle(DamSetDesign.routineTint(for: routine))
+                .frame(width: 44, height: 44)
+                .background(DamSetDesign.routineTint(for: routine).opacity(0.12), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
 
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(routine.routineName)
                     .font(.headline)
                     .foregroundStyle(.primary)
-                Text(routineSummary(routine))
-                    .font(.subheadline)
+                Text("\(routine.plannedSets.count) sets · \(totalRestMinutes(routine)) min rest · \(exerciseSummary(routine))")
+                    .font(.footnote)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
-                Text("\(routine.plannedSets.count) sets · \(totalRestMinutes(routine)) min rest")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
             }
-            Spacer()
-            VStack(spacing: 4) {
-                Image(systemName: "slider.horizontal.3")
-                    .font(.title3)
-                Text("Setup")
-                    .font(.caption2.weight(.semibold))
-            }
-            .foregroundStyle(DamSetDesign.routineTint(for: routine))
+            Spacer(minLength: 8)
+            Image(systemName: "chevron.right")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(.tertiary)
         }
-        .cardSurface(cornerRadius: 26)
+        .cardSurface()
     }
 
-    private func routineSummary(_ routine: RoutineTemplate) -> String {
+    private func exerciseSummary(_ routine: RoutineTemplate) -> String {
         let names = Array(Set(routine.plannedSets.map(\.exerciseName))).sorted()
         return names.prefix(2).joined(separator: " · ")
     }
@@ -179,29 +127,31 @@ private struct HistoryRow: View {
 
     var body: some View {
         HStack(spacing: 14) {
-            Image(systemName: "checkmark.seal.fill")
-                .foregroundStyle(.green)
-                .font(.title2)
+            Image(systemName: "checkmark")
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(DamSetDesign.moss)
                 .frame(width: 44, height: 44)
-                .background(.green.opacity(0.12), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-            VStack(alignment: .leading, spacing: 4) {
+                .background(DamSetDesign.moss.opacity(0.12), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            VStack(alignment: .leading, spacing: 3) {
                 Text(summary.routineName)
                     .font(.headline)
+                    .foregroundStyle(.primary)
                 Text(summary.workoutEndTime.formatted(date: .abbreviated, time: .shortened))
-                    .font(.caption)
+                    .font(.footnote)
                     .foregroundStyle(.secondary)
             }
-            Spacer()
-            VStack(alignment: .trailing, spacing: 4) {
+            Spacer(minLength: 8)
+            VStack(alignment: .trailing, spacing: 3) {
                 Text("\(summary.totalSets) sets")
                     .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.primary)
                 Text("\(summary.totalVolume.formatted()) kg")
-                    .font(.caption)
+                    .font(.footnote)
                     .foregroundStyle(.secondary)
                     .monospacedDigit()
             }
         }
-        .cardSurface(cornerRadius: 22)
+        .cardSurface()
     }
 }
 
