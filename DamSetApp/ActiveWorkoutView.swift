@@ -127,8 +127,8 @@ struct ActiveWorkoutView: View {
 
             FlowMetric(
                 title: "Next",
-                value: nextExerciseName(after: session) ?? "Done",
-                caption: nextSetCaption(after: session),
+                value: session.nextPlannedSet?.exerciseName ?? "Done",
+                caption: nextSetCaption(for: session),
                 symbol: "forward.fill",
                 color: .white.opacity(0.82)
             )
@@ -337,16 +337,8 @@ struct ActiveWorkoutView: View {
         }
     }
 
-    private func nextExerciseName(after session: WorkoutRoutineSession) -> String? {
-        let nextIndex = session.currentSetIndex
-        guard session.plannedSets.indices.contains(nextIndex) else { return nil }
-        return session.plannedSets[nextIndex].exerciseName
-    }
-
-    private func nextSetCaption(after session: WorkoutRoutineSession) -> String {
-        let nextIndex = session.currentSetIndex
-        guard session.plannedSets.indices.contains(nextIndex) else { return "finish" }
-        let next = session.plannedSets[nextIndex]
+    private func nextSetCaption(for session: WorkoutRoutineSession) -> String {
+        guard let next = session.nextPlannedSet else { return "finish" }
         return "\(next.targetWeight.formatted()) kg × \(next.targetReps)"
     }
 

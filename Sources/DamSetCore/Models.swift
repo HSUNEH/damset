@@ -180,9 +180,17 @@ public struct WorkoutRoutineSession: Identifiable, Codable, Equatable, Sendable 
     public var restCountdownCue: RestCountdownCue
 
     public var id: String { sessionId }
+
+    /// `currentSetIndex` is 1-based; planned sets are addressed through these
+    /// accessors so the off-by-one lives in exactly one place.
     public var currentPlannedSet: PlannedSet? {
         guard plannedSets.indices.contains(currentSetIndex - 1) else { return nil }
         return plannedSets[currentSetIndex - 1]
+    }
+
+    public var nextPlannedSet: PlannedSet? {
+        guard plannedSets.indices.contains(currentSetIndex) else { return nil }
+        return plannedSets[currentSetIndex]
     }
 }
 

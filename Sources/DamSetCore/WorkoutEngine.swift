@@ -118,9 +118,8 @@ public struct WorkoutEngine: Sendable {
 
     public func advanceToNextSet(session: inout WorkoutRoutineSession) throws {
         guard session.sessionStatus == .resting || session.lockScreenState.phase == .readyForNextSet else { return }
+        guard let nextSet = session.nextPlannedSet else { throw WorkoutEngineError.noActiveSet }
         let nextIndex = session.currentSetIndex + 1
-        guard session.plannedSets.indices.contains(nextIndex - 1) else { throw WorkoutEngineError.noActiveSet }
-        let nextSet = session.plannedSets[nextIndex - 1]
         session.currentSetIndex = nextIndex
         session.sessionStatus = .active
         session.lockScreenState = LockScreenState(

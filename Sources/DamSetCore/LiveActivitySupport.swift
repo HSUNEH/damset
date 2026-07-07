@@ -120,16 +120,11 @@ public enum WorkoutSessionSync {
             if session.sessionStatus == .resting,
                session.lockScreenState.phase == .resting,
                let resumeAt = session.lockScreenState.resumeAt {
-                RestCueScheduler.scheduleRestEndCue(resumeAt: resumeAt, upcomingExercise: upcomingExerciseName(session))
+                RestCueScheduler.scheduleRestEndCue(resumeAt: resumeAt, upcomingExercise: session.nextPlannedSet?.exerciseName)
             } else if session.lockScreenState.phase == .performingSet {
                 RestCueScheduler.cancelPendingCues()
             }
         }
         await updateLiveActivity(for: session)
-    }
-
-    private static func upcomingExerciseName(_ session: WorkoutRoutineSession) -> String? {
-        guard session.plannedSets.indices.contains(session.currentSetIndex) else { return nil }
-        return session.plannedSets[session.currentSetIndex].exerciseName
     }
 }
