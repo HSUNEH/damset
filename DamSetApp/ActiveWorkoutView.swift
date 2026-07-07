@@ -165,7 +165,7 @@ struct ActiveWorkoutView: View {
 
     private func repsControl(_ session: WorkoutRoutineSession) -> some View {
         HStack(spacing: 20) {
-            IronPlateControl(symbol: "minus", label: "Decrease reps") {
+            GlassCircleControl(symbol: "minus", label: "Decrease reps") {
                 viewModel.adjustReps(-1)
             }
             .disabled(!session.lockScreenState.canDecrementReps)
@@ -183,7 +183,7 @@ struct ActiveWorkoutView: View {
             }
             .frame(minWidth: 84)
 
-            IronPlateControl(symbol: "plus", label: "Increase reps") {
+            GlassCircleControl(symbol: "plus", label: "Increase reps") {
                 viewModel.adjustReps(1)
             }
         }
@@ -199,7 +199,8 @@ struct ActiveWorkoutView: View {
                     .monospacedDigit()
                     .frame(minWidth: 64, minHeight: 40)
             }
-            .buttonStyle(SteelBarButtonStyle(cornerRadius: 12))
+            .buttonStyle(.glass)
+            .tint(DamSetDesign.accent)
             .disabled(viewModel.actualWeight <= 0)
             .accessibilityLabel("Decrease weight by 2.5 kilograms")
 
@@ -221,7 +222,8 @@ struct ActiveWorkoutView: View {
                     .monospacedDigit()
                     .frame(minWidth: 64, minHeight: 40)
             }
-            .buttonStyle(SteelBarButtonStyle(cornerRadius: 12))
+            .buttonStyle(.glass)
+            .tint(DamSetDesign.accent)
             .accessibilityLabel("Increase weight by 2.5 kilograms")
         }
         .cardSurface(cornerRadius: 20)
@@ -232,9 +234,11 @@ struct ActiveWorkoutView: View {
             viewModel.completeSet()
         } label: {
             Text("Set Done")
-                .frame(maxWidth: .infinity, minHeight: 56)
+                .font(.headline)
+                .frame(maxWidth: .infinity, minHeight: 40)
         }
-        .buttonStyle(SteelBarButtonStyle())
+        .buttonStyle(.glassProminent)
+        .tint(DamSetDesign.accent)
         .accessibilityLabel("Complete current set")
     }
 
@@ -278,9 +282,11 @@ struct ActiveWorkoutView: View {
             }
             Button { viewModel.closeWorkout() } label: {
                 Text("Done")
-                    .frame(minWidth: 140, minHeight: 48)
+                    .font(.headline)
+                    .frame(minWidth: 140, minHeight: 36)
             }
-            .buttonStyle(SteelBarButtonStyle(cornerRadius: 14))
+            .buttonStyle(.glassProminent)
+            .tint(DamSetDesign.accent)
         }
         .frame(maxWidth: .infinity)
         .cardSurface(cornerRadius: 20)
