@@ -50,6 +50,19 @@ final class WorkoutEngineTests: XCTestCase {
         XCTAssertEqual(session.lockScreenState.resumeAt, now.addingTimeInterval(TimeInterval(routine.plannedSets[0].restDurationSeconds)))
     }
 
+    func testAdjustActualRepsDuringRestCorrectsCompletedSet() throws {
+        let routine = try XCTUnwrap(RoutineCatalog.defaultRoutines.first)
+        let engine = WorkoutEngine()
+        var session = try engine.startSession(routine: routine)
+        try engine.completeCurrentSet(session: &session, now: Date(timeIntervalSince1970: 100))
+
+        try engine.adjustActualReps(session: &session, delta: 2)
+
+        XCTAssertEqual(session.lockScreenState.actualReps, routine.plannedSets[0].targetReps + 2)
+        XCTAssertEqual(session.completedSets.last?.actualReps, routine.plannedSets[0].targetReps + 2)
+        XCTAssertEqual(session.lockScreenState.phase, .resting)
+    }
+
     func testRestCountdownBecomesReadyAndAdvancesToNextSet() throws {
         let routine = try XCTUnwrap(RoutineCatalog.defaultRoutines.first)
         let engine = WorkoutEngine()

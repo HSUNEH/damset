@@ -10,14 +10,16 @@ import DamSetCore
 ///
 /// The session is refreshed against wall-clock time first: once rest has fully
 /// elapsed, the action applies to the set the user is about to perform. Taps
-/// during an active rest are ignored (mirrors LockScreenActionPolicy — only
-/// reps adjustment and set completion are allowed, and only while performing).
-private func performLockScreenAction(_ mutate: (WorkoutEngine, inout WorkoutRoutineSession) throws -> Void) async {
+/// during an active rest can still correct the just-finished rep count, but
+/// completing a set remains performing-only.
+private func performLockScreenAction(allowsRestingCorrection: Bool = false, _ mutate: (WorkoutEngine, inout WorkoutRoutineSession) throws -> Void) async {
     let store = WorkoutSessionSync.sessionStore
     guard var session = (try? store.load()) ?? nil else { return }
     let engine = WorkoutEngine()
     engine.refresh(session: &session)
-    guard session.lockScreenState.phase == .performingSet else {
+    let canMutate = session.lockScreenState.phase == .performingSet ||
+        (allowsRestingCorrection && session.lockScreenState.phase == .resting)
+    guard canMutate else {
         await WorkoutSessionSync.applyDidChange(session)
         return
     }
@@ -39,7 +41,7 @@ struct AdjustRepsIntent: LiveActivityIntent {
     init(delta: Int) { self.delta = delta }
 
     func perform() async throws -> some IntentResult {
-        await performLockScreenAction { engine, session in
+        await performLockScreenAction(allowsRestingCorrection: true) { engine, session in
             try engine.adjustActualReps(session: &session, delta: delta)
         }
         return .result()

@@ -34,7 +34,12 @@ public struct WorkoutEngine: Sendable {
 
     public func adjustActualReps(session: inout WorkoutRoutineSession, delta: Int) throws {
         guard session.sessionStatus != .completed else { throw WorkoutEngineError.sessionAlreadyCompleted }
-        session.lockScreenState.actualReps = max(0, session.lockScreenState.actualReps + delta)
+        let updatedReps = max(0, session.lockScreenState.actualReps + delta)
+        session.lockScreenState.actualReps = updatedReps
+        if session.sessionStatus == .resting,
+           let lastCompletedIndex = session.completedSets.indices.last {
+            session.completedSets[lastCompletedIndex].actualReps = updatedReps
+        }
     }
 
     /// Completes the current set. `actualWeight` overrides the recorded weight when the user
