@@ -2,6 +2,12 @@ import Foundation
 import Observation
 import DamSetCore
 
+enum RestAlertDeliveryStatus: Equatable {
+    case checking
+    case enabled
+    case disabled(canRequestFallback: Bool)
+}
+
 @MainActor
 @Observable
 final class WorkoutViewModel {
@@ -17,7 +23,9 @@ final class WorkoutViewModel {
     var isCompletingSet = false
     var isClosingWorkout = false
     var errorMessage: String?
+    var restAlertDeliveryStatus: RestAlertDeliveryStatus = .checking
     @ObservationIgnored private var pendingSync: Task<Void, Never>?
+    @ObservationIgnored private var restAuthorizationTask: Task<Void, Never>?
 
     var isBusy: Bool { isCompletingSet || isClosingWorkout }
 
@@ -27,7 +35,7 @@ final class WorkoutViewModel {
     ) {
         self.store = store
         self.routineStore = routineStore
-        reloadRoutines()
+        _ = reloadRoutines()
         reloadSummaries()
         adoptSharedSessionIfPresent()
     }
@@ -36,10 +44,21 @@ final class WorkoutViewModel {
     func saveRoutine(_ routine: RoutineTemplate) -> Bool {
         do {
             try routineStore.upsert(routine)
-            reloadRoutines()
-            return true
+            return reloadRoutines()
         } catch {
             report(error, context: "Routine could not be saved")
+            return false
+        }
+    }
+
+    @discardableResult
+    func deleteRoutine(_ routine: RoutineTemplate) -> Bool {
+        guard activeSession?.routineId != routine.routineId else { return false }
+        do {
+            try routineStore.delete(routineId: routine.routineId)
+            return reloadRoutines()
+        } catch {
+            report(error, context: "Routine could not be deleted")
             return false
         }
     }
@@ -51,7 +70,7 @@ final class WorkoutViewModel {
             activeSession = session
             lastSummary = nil
             cuePlayer.reset()
-            RestCueScheduler.requestAuthorization()
+            refreshRestAlertStatus(requestAuthorization: true)
             WorkoutSessionSync.startLiveActivity(for: session)
             sync(session)
         } catch {
@@ -194,6 +213,7 @@ final class WorkoutViewModel {
         engine.addSessionScopedSet(
             session: &session,
             exerciseName: planned.exerciseName,
+            exerciseKind: planned.exerciseKind,
             targetWeight: planned.targetWeight,
             targetReps: planned.targetReps,
             restDurationSeconds: planned.restDurationSeconds
@@ -266,14 +286,20 @@ final class WorkoutViewModel {
     /// Re-syncs with the App Group store after a Live Activity intent mutated
     /// the session while the app was backgrounded.
     func refreshFromSharedStore() {
+        refreshRestAlertStatus()
         reloadSummaries()
         guard let current = activeSession else { return }
         do {
-            if let stored = try sessionStore.load(), stored.sessionId == current.sessionId {
+            if var stored = try sessionStore.load(), stored.sessionId == current.sessionId {
+                engine.refresh(session: &stored)
                 if stored != current {
                     activeSession = stored
                     cuePlayer.reset()
                 }
+                // Reconcile persisted rest state with both Live Activity and
+                // the self-ending countdown cue after relaunch/foregrounding.
+                // This also cancels an expired or stale pending cue.
+                sync(stored)
             } else if current.sessionStatus != .completed {
                 // The intent finished the workout: session file is gone, summary saved.
                 if let summary = try store.summary(sessionId: current.sessionId) {
@@ -292,12 +318,50 @@ final class WorkoutViewModel {
 
     private func adoptSharedSessionIfPresent() {
         do {
-            guard let stored = try sessionStore.load(),
+            guard var stored = try sessionStore.load(),
                   stored.sessionStatus != .completed, stored.sessionStatus != .cancelled else { return }
+            engine.refresh(session: &stored)
             activeSession = stored
             WorkoutSessionSync.startLiveActivity(for: stored)
+            sync(stored)
         } catch {
             report(error, context: "Saved workout could not be restored")
+        }
+    }
+
+    func refreshRestAlertStatus(requestAuthorization: Bool = false) {
+        restAuthorizationTask?.cancel()
+        restAuthorizationTask = Task { [weak self] in
+            let notificationState: RestNotificationAuthorizationState
+            if requestAuthorization {
+                notificationState = await RestCueScheduler.requestAuthorization()
+            } else {
+                notificationState = await RestCueScheduler.authorizationState()
+            }
+            guard !Task.isCancelled else { return }
+            self?.restAlertDeliveryStatus = Self.deliveryStatus(notification: notificationState)
+        }
+    }
+
+    func enableRestCueNotifications() {
+        restAuthorizationTask?.cancel()
+        restAuthorizationTask = Task { [weak self] in
+            let notificationState = await RestCueScheduler.requestAuthorization()
+            guard !Task.isCancelled else { return }
+            self?.restAlertDeliveryStatus = Self.deliveryStatus(notification: notificationState)
+        }
+    }
+
+    private static func deliveryStatus(
+        notification: RestNotificationAuthorizationState
+    ) -> RestAlertDeliveryStatus {
+        switch notification {
+        case .authorized:
+            return .enabled
+        case .notDetermined:
+            return .disabled(canRequestFallback: true)
+        case .authorizedWithoutSound, .denied, .unavailable, .failed:
+            return .disabled(canRequestFallback: false)
         }
     }
 
@@ -362,12 +426,14 @@ final class WorkoutViewModel {
         }
     }
 
-    private func reloadRoutines() {
+    @discardableResult
+    private func reloadRoutines() -> Bool {
         do {
             catalog = RoutineCatalog(routines: try routineStore.loadAll())
+            return true
         } catch {
-            catalog = RoutineCatalog()
             report(error, context: "Saved routines could not be loaded")
+            return false
         }
     }
 }

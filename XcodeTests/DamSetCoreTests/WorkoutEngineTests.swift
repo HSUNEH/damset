@@ -473,6 +473,90 @@ final class WorkoutEngineTests: XCTestCase {
         XCTAssertThrowsError(try engine.adjustActualWeight(session: &session, delta: 2.5))
     }
 
+    func testRestCuePlanSchedulesOnlyAnActiveRestDeadline() throws {
+        let routine = try XCTUnwrap(RoutineCatalog.defaultRoutines.first)
+        let engine = WorkoutEngine()
+        let completedAt = Date(timeIntervalSince1970: 100)
+        var session = try engine.startSession(routine: routine)
+
+        try engine.completeCurrentSet(session: &session, now: completedAt)
+
+        XCTAssertEqual(
+            RestCueScheduler.plan(for: session),
+            .schedule(
+                resumeAt: completedAt.addingTimeInterval(
+                    TimeInterval(routine.plannedSets[0].restDurationSeconds)
+                ),
+                upcomingExercise: routine.plannedSets[1].exerciseName
+            )
+        )
+    }
+
+    func testRestCuePlanCancelsWhenRestIsMadeReady() throws {
+        let routine = try XCTUnwrap(RoutineCatalog.defaultRoutines.first)
+        let engine = WorkoutEngine()
+        var session = try engine.startSession(routine: routine)
+        try engine.completeCurrentSet(session: &session, now: Date(timeIntervalSince1970: 100))
+
+        try engine.adjustRest(
+            session: &session,
+            deltaSeconds: -999,
+            now: Date(timeIntervalSince1970: 110)
+        )
+
+        XCTAssertEqual(session.lockScreenState.phase, .readyForNextSet)
+        XCTAssertEqual(RestCueScheduler.plan(for: session), .cancel)
+    }
+
+    func testRestCuePlanCancelsOutsideRest() throws {
+        let routine = try XCTUnwrap(RoutineCatalog.defaultRoutines.first)
+        let engine = WorkoutEngine()
+        let session = try engine.startSession(routine: routine)
+
+        XCTAssertEqual(RestCueScheduler.plan(for: session), .cancel)
+    }
+
+    func testRestCueNotificationUsesOneCombinedCountdownSound() {
+        let spec = RestCueScheduler.notificationSpec(
+            resumeAt: Date(timeIntervalSince1970: 100),
+            upcomingExercise: "Bench Press",
+            now: Date(timeIntervalSince1970: 90)
+        )
+
+        XCTAssertEqual(
+            spec,
+            RestCueNotificationSpec(
+                identifier: "damset.restcue.countdown",
+                title: "Next set in 3…",
+                body: "Bench Press",
+                delay: 7,
+                soundFileName: "RestCountdown.wav"
+            )
+        )
+    }
+
+    func testRestCueNotificationUsesStandaloneGoSoundForShortRest() {
+        let spec = RestCueScheduler.notificationSpec(
+            resumeAt: Date(timeIntervalSince1970: 100),
+            upcomingExercise: nil,
+            now: Date(timeIntervalSince1970: 98)
+        )
+
+        XCTAssertEqual(spec?.identifier, "damset.restcue.start")
+        XCTAssertEqual(spec?.delay, 2)
+        XCTAssertEqual(spec?.soundFileName, "RestStart.wav")
+    }
+
+    func testRestCueNotificationSkipsElapsedDeadline() {
+        XCTAssertNil(
+            RestCueScheduler.notificationSpec(
+                resumeAt: Date(timeIntervalSince1970: 100),
+                upcomingExercise: nil,
+                now: Date(timeIntervalSince1970: 100)
+            )
+        )
+    }
+
     func testRestCueDecisionRequiresPlayingBeforeAndAfter() {
         let engine = WorkoutEngine()
         XCTAssertEqual(engine.decideRestCue(playbackWasPlaying: true, playbackStillPlayingAfterCue: true, iOSPolicyAllowsIdealCue: true), .idealAudioAllowed)

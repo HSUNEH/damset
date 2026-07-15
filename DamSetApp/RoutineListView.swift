@@ -4,71 +4,168 @@ import DamSetCore
 struct RoutineListView: View {
     @State var viewModel: WorkoutViewModel
     @Environment(\.scenePhase) private var scenePhase
+    @State private var launchRoutine: RoutineTemplate?
+    @State private var routinePendingStart: RoutineTemplate?
+    @State private var routinePendingChooser: RoutineTemplate?
+    @State private var newRoutine: RoutineTemplate?
+    @State private var routinePendingDeletion: RoutineTemplate?
 
     var body: some View {
+        TabView {
+            routinesNavigation
+                .tabItem {
+                    Label("Routines", systemImage: "list.bullet.rectangle")
+                }
+
+            NavigationStack {
+                WorkoutHistoryCalendarView(summaries: viewModel.savedSummaries)
+            }
+            .gymNavigationChrome()
+            .tabItem {
+                Label("History", systemImage: "calendar")
+            }
+        }
+        .background(DamSetDesign.screenBackground.ignoresSafeArea())
+        .workoutSessionCover(item: Binding(get: { viewModel.activeSession }, set: { viewModel.activeSession = $0 })) { _ in
+            ActiveWorkoutView(viewModel: viewModel)
+        }
+        .sheet(item: $launchRoutine, onDismiss: startPendingRoutine) { routine in
+            WorkoutLaunchView(
+                routine: routine,
+                onStart: { selectedRoutine in
+                    routinePendingStart = selectedRoutine
+                    launchRoutine = nil
+                },
+                onCancel: { launchRoutine = nil }
+            )
+        }
+        .sheet(item: $newRoutine, onDismiss: presentPendingSetupChooser) { routine in
+            NavigationStack {
+                RoutineSetupView(
+                    routine: routine,
+                    viewModel: viewModel,
+                    // This setup is itself a sheet. Queue the chooser and let
+                    // the sheet's onDismiss present it after the transition.
+                    onChooseWorkout: { routinePendingChooser = $0 }
+                )
+            }
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active {
+                viewModel.refreshFromSharedStore()
+            }
+        }
+        .confirmationDialog(
+            "Delete routine?",
+            isPresented: Binding(
+                get: { routinePendingDeletion != nil },
+                set: { if !$0 { routinePendingDeletion = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Delete Routine", role: .destructive) {
+                if let routinePendingDeletion {
+                    _ = viewModel.deleteRoutine(routinePendingDeletion)
+                }
+                routinePendingDeletion = nil
+            }
+            Button("Cancel", role: .cancel) { routinePendingDeletion = nil }
+        } message: {
+            Text(routinePendingDeletion?.routineName ?? "This cannot be undone.")
+        }
+        .alert("Something went wrong", isPresented: errorIsPresented) {
+            Button("OK", role: .cancel) {
+                viewModel.errorMessage = nil
+            }
+        } message: {
+            Text(viewModel.errorMessage ?? "Please try again.")
+        }
+        .tint(DamSetDesign.accent)
+        .preferredColorScheme(.dark)
+    }
+
+    private var routinesNavigation: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 28) {
+                VStack(alignment: .leading, spacing: 20) {
                     routineSection
-                    if !viewModel.savedSummaries.isEmpty {
-                        historySection
-                    }
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 8)
                 .padding(.bottom, 28)
             }
             .background(DamSetDesign.screenBackground.ignoresSafeArea())
-            .navigationTitle("DamSet")
+            .navigationTitle("Routines")
             .inlineNavigationTitle()
-            .workoutSessionCover(item: Binding(get: { viewModel.activeSession }, set: { viewModel.activeSession = $0 })) { _ in
-                ActiveWorkoutView(viewModel: viewModel)
-            }
-            .onChange(of: scenePhase) { _, phase in
-                if phase == .active {
-                    viewModel.refreshFromSharedStore()
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        newRoutine = makeNewRoutine()
+                    } label: {
+                        Image(systemName: "plus")
+                            .font(.body.weight(.bold))
+                            .frame(width: 44, height: 44)
+                    }
+                    .accessibilityLabel("Create routine")
                 }
-            }
-            .alert("Something went wrong", isPresented: errorIsPresented) {
-                Button("OK", role: .cancel) {
-                    viewModel.errorMessage = nil
-                }
-            } message: {
-                Text(viewModel.errorMessage ?? "Please try again.")
             }
         }
-        .tint(DamSetDesign.accent)
-        .preferredColorScheme(.dark)
         .gymNavigationChrome()
     }
 
     private var routineSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            SectionHeader(title: "Routines")
-            VStack(spacing: 10) {
-                ForEach(viewModel.catalog.routines) { routine in
-                    HStack(spacing: 10) {
-                        NavigationLink {
-                            RoutineSetupView(routine: routine, viewModel: viewModel)
-                        } label: {
-                            RoutineRow(routine: routine)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                        .buttonStyle(.plain)
+            SectionHeader(
+                title: "My Routines",
+                subtitle: "Edit the template here. Choose today's exercises when you start."
+            )
+            if viewModel.catalog.routines.isEmpty {
+                ContentUnavailableView {
+                    Label("No routines", systemImage: "list.bullet.clipboard")
+                } description: {
+                    Text("Build a routine with your own name, emoji, and exercises.")
+                } actions: {
+                    Button("Create Routine") { newRoutine = makeNewRoutine() }
+                        .buttonStyle(GymPrimaryButtonStyle())
+                }
+                .frame(maxWidth: .infinity, minHeight: 260)
+                .cardSurface()
+            } else {
+                VStack(spacing: 10) {
+                    ForEach(viewModel.catalog.routines) { routine in
+                        HStack(spacing: 8) {
+                            NavigationLink {
+                                RoutineSetupView(
+                                    routine: routine,
+                                    viewModel: viewModel,
+                                    onChooseWorkout: queueSetupChooser
+                                )
+                            } label: {
+                                RoutineRow(routine: routine)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                            .buttonStyle(.plain)
 
-                        Button {
-                            viewModel.start(routine)
-                        } label: {
-                            Image(systemName: "bolt.fill")
-                                .font(.body.weight(.bold))
-                                .foregroundStyle(DamSetDesign.accent)
-                                .frame(width: 44, height: 44)
+                            Button {
+                                launchRoutine = routine
+                            } label: {
+                                Image(systemName: "slider.horizontal.3")
+                                    .font(.body.weight(.bold))
+                                    .foregroundStyle(DamSetDesign.accent)
+                                    .frame(width: 44, height: 44)
+                            }
+                            .buttonStyle(GymMetalControlButtonStyle(shape: .circle))
+                            .accessibilityLabel("Choose today's exercises for \(routine.routineName)")
+                            .disabled(viewModel.activeSession != nil || viewModel.isBusy)
+
                         }
-                        .buttonStyle(GymMetalControlButtonStyle(shape: .circle))
-                        .accessibilityLabel("Quick start \(routine.routineName)")
-                        .disabled(viewModel.activeSession != nil || viewModel.isBusy)
+                        .cardSurface()
+                        .contextMenu {
+                            Button("Delete", systemImage: "trash", role: .destructive) {
+                                routinePendingDeletion = routine
+                            }
+                        }
                     }
-                    .cardSurface()
                 }
             }
         }
@@ -85,20 +182,47 @@ struct RoutineListView: View {
         )
     }
 
-    private var historySection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            SectionHeader(title: "History")
-            VStack(spacing: 10) {
-                ForEach(viewModel.savedSummaries) { summary in
-                    NavigationLink {
-                        WorkoutSummaryDetailView(summary: summary)
-                    } label: {
-                        HistoryRow(summary: summary)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
+    private func makeNewRoutine() -> RoutineTemplate {
+        RoutineTemplate(
+            routineId: "custom-\(UUID().uuidString)",
+            routineName: "New Routine",
+            emoji: "🔥",
+            plannedSets: [
+                PlannedSet(
+                    setId: "custom-set-\(UUID().uuidString)",
+                    exerciseName: "New Exercise",
+                    exerciseKind: .weighted,
+                    targetWeight: 20,
+                    targetReps: 8,
+                    restDurationSeconds: 90,
+                    manuallyAdded: true
+                )
+            ]
+        )
+    }
+
+    /// Start only after the exercise chooser has finished dismissing. This
+    /// avoids asking SwiftUI to dismiss a sheet and present the workout cover
+    /// in the same presentation transaction.
+    private func startPendingRoutine() {
+        guard let routinePendingStart else { return }
+        self.routinePendingStart = nil
+        viewModel.start(routinePendingStart)
+    }
+
+    private func queueSetupChooser(_ routine: RoutineTemplate) {
+        routinePendingChooser = routine
+        guard newRoutine == nil else { return }
+        Task { @MainActor in
+            await Task.yield()
+            presentPendingSetupChooser()
         }
+    }
+
+    private func presentPendingSetupChooser() {
+        guard launchRoutine == nil, let routinePendingChooser else { return }
+        self.routinePendingChooser = nil
+        launchRoutine = routinePendingChooser
     }
 }
 
@@ -162,9 +286,16 @@ private struct RoutineRow: View {
     }
 
     private var routineIcon: some View {
-        Image(systemName: DamSetDesign.routineSymbol(for: routine))
-            .font(.system(size: 19, weight: .semibold))
-            .foregroundStyle(DamSetDesign.accent)
+        Group {
+            if let emoji = routine.emoji, !emoji.isEmpty {
+                Text(emoji)
+                    .font(.system(size: 23))
+            } else {
+                Image(systemName: DamSetDesign.routineSymbol(for: routine))
+                    .font(.system(size: 19, weight: .semibold))
+                    .foregroundStyle(DamSetDesign.accent)
+            }
+        }
             .frame(width: 44, height: 44)
             .background(DamSetDesign.controlFill, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
             .overlay {
@@ -257,7 +388,7 @@ private struct HistoryRow: View {
             Text("\(summary.totalSets) sets")
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.primary)
-            Text("\(summary.totalVolume.formatted()) kg")
+            Text(summary.compactTrainingLoadText)
                 .font(.footnote)
                 .foregroundStyle(.secondary)
                 .monospacedDigit()
@@ -292,7 +423,12 @@ struct WorkoutSummaryDetailView: View {
             }
             Section("Totals") {
                 LabeledContent("Total sets", value: "\(summary.totalSets)")
-                LabeledContent("Total volume", value: "\(summary.totalVolume.formatted()) kg")
+                if summary.hasWeightedSets {
+                    LabeledContent("Total volume", value: "\(summary.totalVolume.formatted()) kg")
+                }
+                if summary.hasBodyweightSets {
+                    LabeledContent("Training", value: "Bodyweight")
+                }
                 LabeledContent("Started", value: summary.workoutStartTime.formatted(date: .abbreviated, time: .shortened))
                 LabeledContent("Ended", value: summary.workoutEndTime.formatted(date: .abbreviated, time: .shortened))
             }
@@ -319,7 +455,11 @@ struct WorkoutSummaryDetailView: View {
     }
 
     private func completedSetValue(_ set: CompletedSet) -> some View {
-        Text("\(set.actualWeight.formatted()) kg × \(set.actualReps)")
+        Text(
+            set.exerciseKind == .bodyweight
+                ? "Bodyweight × \(set.actualReps)"
+                : "\(set.actualWeight.formatted()) kg × \(set.actualReps)"
+        )
             .monospacedDigit()
             .foregroundStyle(.primary)
     }

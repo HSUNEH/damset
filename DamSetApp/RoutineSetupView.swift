@@ -4,13 +4,23 @@ import DamSetCore
 struct RoutineSetupView: View {
     let routine: RoutineTemplate
     @Bindable var viewModel: WorkoutViewModel
+    let onChooseWorkout: (RoutineTemplate) -> Void
     @Environment(\.dismiss) private var dismiss
+    @State private var draftEmoji: String
     @State private var draftName: String
     @State private var draftSets: [EditablePlannedSet]
+    @State private var routinePendingChooser: RoutineTemplate?
+    @State private var showDeleteConfirmation = false
 
-    init(routine: RoutineTemplate, viewModel: WorkoutViewModel) {
+    init(
+        routine: RoutineTemplate,
+        viewModel: WorkoutViewModel,
+        onChooseWorkout: @escaping (RoutineTemplate) -> Void
+    ) {
         self.routine = routine
         self.viewModel = viewModel
+        self.onChooseWorkout = onChooseWorkout
+        _draftEmoji = State(initialValue: routine.emoji ?? "🏋️")
         _draftName = State(initialValue: routine.routineName)
         _draftSets = State(initialValue: routine.plannedSets.map(EditablePlannedSet.init(planned:)))
     }
@@ -20,6 +30,7 @@ struct RoutineSetupView: View {
             VStack(alignment: .leading, spacing: 30) {
                 headerCard
                 setsEditor
+                deleteRoutineButton
             }
             .padding(.horizontal, 20)
             .padding(.top, 12)
@@ -56,14 +67,40 @@ struct RoutineSetupView: View {
         .tint(DamSetDesign.accent)
         .preferredColorScheme(.dark)
         .gymNavigationChrome()
+        .onDisappear {
+            guard let routinePendingChooser else { return }
+            self.routinePendingChooser = nil
+            onChooseWorkout(routinePendingChooser)
+        }
+        .confirmationDialog("Delete routine?", isPresented: $showDeleteConfirmation, titleVisibility: .visible) {
+            Button("Delete Routine", role: .destructive) {
+                guard viewModel.deleteRoutine(routine) else { return }
+                dismiss()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("\(routine.routineName) will be removed from your routines.")
+        }
     }
 
     private var headerCard: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            TextField("Routine name", text: $draftName)
-                .font(.title2.bold())
-                .foregroundStyle(.primary)
-                .tint(DamSetDesign.accent)
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .center, spacing: 12) {
+                TextField("🏋️", text: $draftEmoji)
+                    .font(.system(size: 30))
+                    .multilineTextAlignment(.center)
+                    .frame(width: 54, height: 54)
+                    .background(DamSetDesign.controlFill, in: RoundedRectangle(cornerRadius: 13))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 13)
+                            .stroke(DamSetDesign.steelMuted, lineWidth: 1)
+                    }
+                    .accessibilityLabel("Routine emoji")
+                TextField("Routine name", text: $draftName)
+                    .font(.title2.bold())
+                    .foregroundStyle(.primary)
+                    .tint(DamSetDesign.accent)
+            }
             Text("\(draftSets.count) sets · \(totalRestMinutes) rest")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
@@ -74,10 +111,11 @@ struct RoutineSetupView: View {
 
     private var setsEditor: some View {
         VStack(alignment: .leading, spacing: 12) {
-            SectionHeader(title: "Sets", subtitle: "Exercise · kg · reps · rest")
+            SectionHeader(title: "Sets", subtitle: "Exercise · type · reps · rest")
             ForEach($draftSets) { $set in
                 EditableSetCard(
                     set: $set,
+                    showsExerciseNameError: set.exerciseName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
                     canDelete: draftSets.count > 1,
                     canMoveUp: draftSets.first?.id != set.id,
                     canMoveDown: draftSets.last?.id != set.id,
@@ -108,11 +146,23 @@ struct RoutineSetupView: View {
         }
     }
 
+    private var deleteRoutineButton: some View {
+        Button(role: .destructive) {
+            showDeleteConfirmation = true
+        } label: {
+            Label("Delete Routine", systemImage: "trash")
+                .font(.body.weight(.semibold))
+                .frame(maxWidth: .infinity, minHeight: 48)
+        }
+        .buttonStyle(.bordered)
+        .tint(DamSetDesign.accent)
+    }
+
     private var startButton: some View {
         Button {
             saveAndStart()
         } label: {
-            Text("Start Workout")
+            Text("Choose Today's Workout")
                 .font(.headline)
                 .foregroundStyle(.white)
                 .frame(maxWidth: .infinity, minHeight: 40)
@@ -121,12 +171,13 @@ struct RoutineSetupView: View {
         .buttonStyle(GymPrimaryButtonStyle())
         .dynamicTypeSize(...DynamicTypeSize.accessibility2)
         .disabled(!canStart)
-        .accessibilityLabel("Start workout with edited set plan")
+        .accessibilityLabel("Save routine and choose today's exercises")
     }
 
     private var canStart: Bool {
         !draftName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-        draftSets.contains { !$0.exerciseName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        !draftSets.isEmpty &&
+        draftSets.allSatisfy { !$0.exerciseName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
     }
 
     private var totalRestMinutes: String {
@@ -134,15 +185,17 @@ struct RoutineSetupView: View {
         return "\(seconds / 60)m"
     }
 
-    private func makeRoutine() -> RoutineTemplate {
+    private func makeRoutine() -> RoutineTemplate? {
+        guard canStart else { return nil }
+
         let validSets = draftSets
-            .filter { !$0.exerciseName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
             .enumerated()
             .map { index, set in
                 PlannedSet(
                     setId: set.sourceSetId
                         ?? "\(routine.routineId)-setup-\(index + 1)-\(set.id.uuidString)",
                     exerciseName: set.exerciseName.trimmingCharacters(in: .whitespacesAndNewlines),
+                    exerciseKind: set.exerciseKind,
                     targetWeight: set.targetWeight,
                     targetReps: set.targetReps,
                     restDurationSeconds: set.restSeconds,
@@ -153,19 +206,26 @@ struct RoutineSetupView: View {
         return RoutineTemplate(
             routineId: routine.routineId,
             routineName: draftName.trimmingCharacters(in: .whitespacesAndNewlines),
+            emoji: normalizedEmoji,
             plannedSets: validSets
         )
     }
 
+    private var normalizedEmoji: String? {
+        let trimmed = draftEmoji.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let first = trimmed.first else { return nil }
+        return String(first)
+    }
+
     private func saveAndDismiss() {
-        guard viewModel.saveRoutine(makeRoutine()) else { return }
+        guard let routine = makeRoutine(), viewModel.saveRoutine(routine) else { return }
         dismiss()
     }
 
     private func saveAndStart() {
-        let editedRoutine = makeRoutine()
+        guard let editedRoutine = makeRoutine() else { return }
         guard viewModel.saveRoutine(editedRoutine) else { return }
-        viewModel.start(editedRoutine)
+        routinePendingChooser = editedRoutine
         dismiss()
     }
 
@@ -203,6 +263,7 @@ struct RoutineSetupView: View {
 
 private struct EditableSetCard: View {
     @Binding var set: EditablePlannedSet
+    let showsExerciseNameError: Bool
     let canDelete: Bool
     let canMoveUp: Bool
     let canMoveDown: Bool
@@ -245,15 +306,39 @@ private struct EditableSetCard: View {
                 }
             }
 
+            if showsExerciseNameError {
+                Label("Exercise name is required", systemImage: "exclamationmark.circle.fill")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(DamSetDesign.amber)
+                    .accessibilityLabel("Error: Exercise name is required")
+            }
+
+            Picker("Exercise type", selection: $set.exerciseKind) {
+                Label("Bodyweight", systemImage: "figure.strengthtraining.functional")
+                    .tag(ExerciseKind.bodyweight)
+                Label("Weighted", systemImage: "dumbbell.fill")
+                    .tag(ExerciseKind.weighted)
+            }
+            .pickerStyle(.segmented)
+            .onChange(of: set.exerciseKind) { _, kind in
+                if kind == .bodyweight {
+                    set.targetWeight = 0
+                } else {
+                    set.targetWeight = set.lastWeightedTargetWeight
+                }
+            }
+
             if dynamicTypeSize.isAccessibilitySize {
-                StepperField(
-                    title: "kg",
-                    value: weightText,
-                    decrement: { set.targetWeight = max(0, set.targetWeight - 2.5) },
-                    increment: { set.targetWeight += 2.5 },
-                    directEntry: updateWeight
-                )
-                Divider().overlay(DamSetDesign.steelMuted)
+                if set.exerciseKind == .weighted {
+                    StepperField(
+                        title: "kg",
+                        value: weightText,
+                        decrement: { set.targetWeight = max(0, set.targetWeight - 2.5) },
+                        increment: { set.targetWeight += 2.5 },
+                        directEntry: updateWeight
+                    )
+                    Divider().overlay(DamSetDesign.steelMuted)
+                }
                 StepperField(
                     title: "reps",
                     value: "\(set.targetReps)",
@@ -271,16 +356,18 @@ private struct EditableSetCard: View {
                 )
             } else {
                 HStack(spacing: 0) {
-                    StepperField(
-                        title: "kg",
-                        value: weightText,
-                        decrement: { set.targetWeight = max(0, set.targetWeight - 2.5) },
-                        increment: { set.targetWeight += 2.5 },
-                        directEntry: updateWeight
-                    )
-                    Divider()
-                        .overlay(DamSetDesign.steelMuted)
-                        .frame(height: 48)
+                    if set.exerciseKind == .weighted {
+                        StepperField(
+                            title: "kg",
+                            value: weightText,
+                            decrement: { set.targetWeight = max(0, set.targetWeight - 2.5) },
+                            increment: { set.targetWeight += 2.5 },
+                            directEntry: updateWeight
+                        )
+                        Divider()
+                            .overlay(DamSetDesign.steelMuted)
+                            .frame(height: 48)
+                    }
                     StepperField(
                         title: "reps",
                         value: "\(set.targetReps)",
@@ -302,7 +389,10 @@ private struct EditableSetCard: View {
             }
         }
         .dynamicTypeSize(...DynamicTypeSize.accessibility2)
-        .cardSurface(cornerRadius: 20)
+        .cardSurface(
+            cornerRadius: 20,
+            accent: showsExerciseNameError ? DamSetDesign.amber : nil
+        )
     }
 
     private var weightText: String {
@@ -435,7 +525,15 @@ private struct EditablePlannedSet: Identifiable, Equatable {
     var id: UUID
     var sourceSetId: String?
     var exerciseName: String
-    var targetWeight: Double
+    var exerciseKind: ExerciseKind
+    var targetWeight: Double {
+        didSet {
+            if exerciseKind == .weighted {
+                lastWeightedTargetWeight = max(0, targetWeight)
+            }
+        }
+    }
+    var lastWeightedTargetWeight: Double
     var targetReps: Int
     var restSeconds: Int
     var manuallyAdded: Bool
@@ -444,6 +542,7 @@ private struct EditablePlannedSet: Identifiable, Equatable {
         id: UUID = UUID(),
         sourceSetId: String? = nil,
         exerciseName: String = "New Exercise",
+        exerciseKind: ExerciseKind = .weighted,
         targetWeight: Double = 20,
         targetReps: Int = 8,
         restSeconds: Int = 90,
@@ -452,7 +551,10 @@ private struct EditablePlannedSet: Identifiable, Equatable {
         self.id = id
         self.sourceSetId = sourceSetId
         self.exerciseName = exerciseName
-        self.targetWeight = max(0, targetWeight)
+        self.exerciseKind = exerciseKind
+        let normalizedWeight = max(0, targetWeight)
+        self.targetWeight = exerciseKind == .bodyweight ? 0 : normalizedWeight
+        self.lastWeightedTargetWeight = exerciseKind == .weighted ? normalizedWeight : 20
         self.targetReps = max(0, targetReps)
         self.restSeconds = max(0, restSeconds)
         self.manuallyAdded = manuallyAdded
@@ -462,6 +564,7 @@ private struct EditablePlannedSet: Identifiable, Equatable {
         self.init(
             sourceSetId: planned.setId,
             exerciseName: planned.exerciseName,
+            exerciseKind: planned.exerciseKind,
             targetWeight: planned.targetWeight,
             targetReps: planned.targetReps,
             restSeconds: planned.restDurationSeconds,

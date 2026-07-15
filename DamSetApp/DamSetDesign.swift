@@ -383,3 +383,28 @@ extension Int {
         String(format: "%02d:%02d", self / 60, self % 60)
     }
 }
+
+extension WorkoutSummary {
+    var hasWeightedSets: Bool {
+        completedSets.contains { $0.exerciseKind == .weighted }
+    }
+
+    var hasBodyweightSets: Bool {
+        completedSets.contains { $0.exerciseKind == .bodyweight }
+    }
+
+    /// A zero-kilogram weighted set is still weighted training. Derive this
+    /// label from the exercise kind instead of guessing from total volume.
+    var compactTrainingLoadText: String {
+        switch (hasWeightedSets, hasBodyweightSets) {
+        case (true, true):
+            return "\(totalVolume.formatted()) kg + bodyweight"
+        case (true, false):
+            return "\(totalVolume.formatted()) kg"
+        case (false, true):
+            return "Bodyweight"
+        case (false, false):
+            return "No completed sets"
+        }
+    }
+}

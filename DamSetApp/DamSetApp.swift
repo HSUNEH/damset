@@ -7,6 +7,10 @@ struct DamSetApp: App {
         WindowGroup {
             RoutineListView(viewModel: WorkoutViewModel())
                 .preferredColorScheme(.dark)
+                // Gym controls must stay glanceable on compact phones. Keep
+                // Dynamic Type useful without allowing accessibility sizes to
+                // turn a single card title into an entire screen.
+                .dynamicTypeSize(...DynamicTypeSize.xxLarge)
         }
     }
 }

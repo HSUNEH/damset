@@ -118,6 +118,7 @@ struct ActiveWorkoutView: View {
         ScrollView {
             VStack(spacing: 14) {
                 workoutHeader(session)
+                restAlertStatusBanner
 
                 if !dynamicTypeSize.isAccessibilitySize {
                     workoutFlowCard(session)
@@ -127,7 +128,9 @@ struct ActiveWorkoutView: View {
                 case .performingSet:
                     targetCard(session)
                     repsControl(session)
-                    weightCard(session)
+                    if session.lockScreenState.exerciseKind == .weighted {
+                        weightCard(session)
+                    }
                 case .resting, .readyForNextSet:
                     restCard(session.lockScreenState)
                     restCorrectionPanel(session)
@@ -163,6 +166,78 @@ struct ActiveWorkoutView: View {
                     }
             }
         }
+    }
+
+    @ViewBuilder
+    private var restAlertStatusBanner: some View {
+        switch viewModel.restAlertDeliveryStatus {
+        case .checking, .enabled:
+            EmptyView()
+        case .disabled(let canRequestFallback):
+            restAlertBanner(
+                message: "Lock Screen 3 · 2 · 1 sound is off",
+                actionTitle: canRequestFallback ? "Enable sounds" : "Settings",
+                action: canRequestFallback ? viewModel.enableRestCueNotifications : openAppSettings
+            )
+        }
+    }
+
+    private func restAlertBanner(
+        message: String,
+        actionTitle: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: 8) {
+                    restAlertMessage(message)
+                    restAlertAction(actionTitle, action: action)
+                }
+            } else {
+                HStack(spacing: 10) {
+                    restAlertMessage(message)
+                    Spacer(minLength: 4)
+                    restAlertAction(actionTitle, action: action)
+                }
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(DamSetDesign.amber.opacity(0.1), in: RoundedRectangle(cornerRadius: 12))
+        .overlay {
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(DamSetDesign.amber.opacity(0.55), lineWidth: 1)
+        }
+        .accessibilityElement(children: .contain)
+    }
+
+    private func restAlertMessage(_ message: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Image(systemName: "bell.slash.fill")
+                .foregroundStyle(DamSetDesign.amber)
+                .accessibilityHidden(true)
+            Text(message)
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(.primary)
+        }
+    }
+
+    private func restAlertAction(
+        _ title: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(title, action: action)
+            .font(.footnote.weight(.bold))
+            .foregroundStyle(DamSetDesign.amber)
+            .frame(minHeight: 44)
+            .accessibilityHint("Changes how rest completion is delivered while the phone is locked")
+    }
+
+    private func openAppSettings() {
+        #if os(iOS)
+        guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
+        UIApplication.shared.open(url)
+        #endif
     }
 
     private func workoutHeader(_ session: WorkoutRoutineSession) -> some View {
@@ -307,13 +382,13 @@ struct ActiveWorkoutView: View {
                 .monospacedDigit()
                 .contentTransition(.numericText())
             if let planned = session.currentPlannedSet {
-                Text("\(planned.targetWeight.formatted()) kg × \(planned.targetReps) · \(planned.restDurationSeconds.minuteSecondText) rest")
+                Text(targetDescription(planned))
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .monospacedDigit()
             }
             if let last = session.completedSets.last {
-                Label("Last: \(last.exerciseName) · \(last.actualWeight.formatted()) kg × \(last.actualReps)", systemImage: "clock.arrow.circlepath")
+                Label("Last: \(last.exerciseName) · \(completedSetDescription(last))", systemImage: "clock.arrow.circlepath")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -370,9 +445,11 @@ struct ActiveWorkoutView: View {
                 DisclosureGroup(isExpanded: $showRestCorrection) {
                     VStack(spacing: 18) {
                         repsEditor(session)
-                        Divider()
-                            .overlay(DamSetDesign.steelMuted.opacity(0.7))
-                        weightEditor(session)
+                        if session.lockScreenState.exerciseKind == .weighted {
+                            Divider()
+                                .overlay(DamSetDesign.steelMuted.opacity(0.7))
+                            weightEditor(session)
+                        }
                     }
                     .padding(.top, 16)
                 } label: {
@@ -385,9 +462,11 @@ struct ActiveWorkoutView: View {
                 VStack(spacing: 16) {
                     GymSectionLabel(text: "Correct last set")
                     repsEditor(session)
-                    Divider()
-                        .overlay(DamSetDesign.steelMuted.opacity(0.7))
-                    weightEditor(session)
+                    if session.lockScreenState.exerciseKind == .weighted {
+                        Divider()
+                            .overlay(DamSetDesign.steelMuted.opacity(0.7))
+                        weightEditor(session)
+                    }
                 }
             }
 
@@ -608,7 +687,7 @@ struct ActiveWorkoutView: View {
                 .font(.title2.bold())
                 .foregroundStyle(.primary)
             if let summary = viewModel.lastSummary {
-                Text("\(summary.totalSets) sets · \(summary.totalVolume.formatted()) kg volume")
+                Text("\(summary.totalSets) sets · \(summary.compactTrainingLoadText)")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .monospacedDigit()
@@ -687,7 +766,22 @@ struct ActiveWorkoutView: View {
 
     private func nextSetCaption(for session: WorkoutRoutineSession) -> String {
         guard let next = session.nextPlannedSet else { return "finish" }
-        return "\(next.targetWeight.formatted()) kg × \(next.targetReps)"
+        return next.exerciseKind == .bodyweight
+            ? "bodyweight × \(next.targetReps)"
+            : "\(next.targetWeight.formatted()) kg × \(next.targetReps)"
+    }
+
+    private func targetDescription(_ planned: PlannedSet) -> String {
+        let load = planned.exerciseKind == .bodyweight
+            ? "Bodyweight × \(planned.targetReps)"
+            : "\(planned.targetWeight.formatted()) kg × \(planned.targetReps)"
+        return "\(load) · \(planned.restDurationSeconds.minuteSecondText) rest"
+    }
+
+    private func completedSetDescription(_ set: CompletedSet) -> String {
+        set.exerciseKind == .bodyweight
+            ? "bodyweight × \(set.actualReps)"
+            : "\(set.actualWeight.formatted()) kg × \(set.actualReps)"
     }
 
     private var progressEntryIsPresented: Binding<Bool> {

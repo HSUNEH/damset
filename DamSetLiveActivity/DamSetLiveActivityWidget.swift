@@ -177,7 +177,11 @@ struct DamSetLiveActivityWidget: Widget {
                     .font(.system(size: 34, weight: .bold, design: .rounded))
                     .monospacedDigit()
                     .foregroundStyle(TrainingPalette.accent)
-                Text("\(context.state.actualWeight.formatted()) kg · target \(context.state.targetReps)")
+                Text(
+                    context.state.exerciseKind == ExerciseKind.bodyweight.rawValue
+                        ? "Bodyweight · target \(context.state.targetReps)"
+                        : "\(context.state.actualWeight.formatted()) kg · target \(context.state.targetReps)"
+                )
                     .font(.caption2)
                     .foregroundStyle(TrainingPalette.secondary)
                     .monospacedDigit()

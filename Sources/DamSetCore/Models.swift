@@ -11,6 +11,7 @@ public struct RoutineCatalog: Codable, Equatable, Sendable {
         RoutineTemplate(
             routineId: "push-foundation",
             routineName: "Push Foundation",
+            emoji: "🏋️",
             plannedSets: [
                 PlannedSet(setId: "push-bench-1", exerciseName: "Bench Press", targetWeight: 60, targetReps: 8, restDurationSeconds: 90),
                 PlannedSet(setId: "push-bench-2", exerciseName: "Bench Press", targetWeight: 60, targetReps: 8, restDurationSeconds: 90),
@@ -20,6 +21,7 @@ public struct RoutineCatalog: Codable, Equatable, Sendable {
         RoutineTemplate(
             routineId: "pull-foundation",
             routineName: "Pull Foundation",
+            emoji: "💪",
             plannedSets: [
                 PlannedSet(setId: "pull-row-1", exerciseName: "Barbell Row", targetWeight: 50, targetReps: 8, restDurationSeconds: 90),
                 PlannedSet(setId: "pull-row-2", exerciseName: "Barbell Row", targetWeight: 50, targetReps: 8, restDurationSeconds: 90),
@@ -29,6 +31,7 @@ public struct RoutineCatalog: Codable, Equatable, Sendable {
         RoutineTemplate(
             routineId: "legs-foundation",
             routineName: "Legs Foundation",
+            emoji: "🦵",
             plannedSets: [
                 PlannedSet(setId: "legs-squat-1", exerciseName: "Back Squat", targetWeight: 80, targetReps: 5, restDurationSeconds: 120),
                 PlannedSet(setId: "legs-squat-2", exerciseName: "Back Squat", targetWeight: 80, targetReps: 5, restDurationSeconds: 120),
@@ -41,52 +44,190 @@ public struct RoutineCatalog: Codable, Equatable, Sendable {
 public struct RoutineTemplate: Identifiable, Codable, Equatable, Sendable {
     public var routineId: String
     public var routineName: String
+    public var emoji: String?
     public var plannedSets: [PlannedSet]
 
     public var id: String { routineId }
 
-    public init(routineId: String, routineName: String, plannedSets: [PlannedSet]) {
+    public init(
+        routineId: String,
+        routineName: String,
+        emoji: String? = nil,
+        plannedSets: [PlannedSet]
+    ) {
         self.routineId = routineId
         self.routineName = routineName
+        self.emoji = emoji
         self.plannedSets = plannedSets
     }
+
+    private enum CodingKeys: String, CodingKey {
+        case routineId
+        case routineName
+        case emoji
+        case plannedSets
+    }
+
+    /// Routines saved before custom icons existed decode with no icon so the
+    /// app can continue using its normal fallback artwork.
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            routineId: try container.decode(String.self, forKey: .routineId),
+            routineName: try container.decode(String.self, forKey: .routineName),
+            emoji: try container.decodeIfPresent(String.self, forKey: .emoji),
+            plannedSets: try container.decode([PlannedSet].self, forKey: .plannedSets)
+        )
+    }
+}
+
+public enum ExerciseKind: String, Codable, CaseIterable, Equatable, Sendable {
+    case bodyweight
+    case weighted
 }
 
 public struct PlannedSet: Identifiable, Codable, Equatable, Sendable {
     public var setId: String
     public var exerciseName: String
-    public var targetWeight: Double
+    public var exerciseKind: ExerciseKind {
+        didSet {
+            storedTargetWeight = Self.normalizedWeight(storedTargetWeight, for: exerciseKind)
+        }
+    }
+    private var storedTargetWeight: Double
+    public var targetWeight: Double {
+        get { storedTargetWeight }
+        set { storedTargetWeight = Self.normalizedWeight(newValue, for: exerciseKind) }
+    }
     public var targetReps: Int
     public var restDurationSeconds: Int
     public var manuallyAdded: Bool
 
     public var id: String { setId }
 
-    public init(setId: String, exerciseName: String, targetWeight: Double, targetReps: Int, restDurationSeconds: Int, manuallyAdded: Bool = false) {
+    public init(
+        setId: String,
+        exerciseName: String,
+        exerciseKind: ExerciseKind = .weighted,
+        targetWeight: Double,
+        targetReps: Int,
+        restDurationSeconds: Int,
+        manuallyAdded: Bool = false
+    ) {
         self.setId = setId
         self.exerciseName = exerciseName
-        self.targetWeight = max(0, targetWeight)
+        self.exerciseKind = exerciseKind
+        self.storedTargetWeight = Self.normalizedWeight(targetWeight, for: exerciseKind)
         self.targetReps = max(0, targetReps)
         self.restDurationSeconds = max(0, restDurationSeconds)
         self.manuallyAdded = manuallyAdded
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case setId
+        case exerciseName
+        case exerciseKind
+        case targetWeight
+        case targetReps
+        case restDurationSeconds
+        case manuallyAdded
+    }
+
+    /// Existing routine files did not identify an exercise kind. Treat them as
+    /// weighted so their saved kilogram targets retain their original meaning.
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            setId: try container.decode(String.self, forKey: .setId),
+            exerciseName: try container.decode(String.self, forKey: .exerciseName),
+            exerciseKind: try container.decodeIfPresent(ExerciseKind.self, forKey: .exerciseKind) ?? .weighted,
+            targetWeight: try container.decode(Double.self, forKey: .targetWeight),
+            targetReps: try container.decode(Int.self, forKey: .targetReps),
+            restDurationSeconds: try container.decode(Int.self, forKey: .restDurationSeconds),
+            manuallyAdded: try container.decodeIfPresent(Bool.self, forKey: .manuallyAdded) ?? false
+        )
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(setId, forKey: .setId)
+        try container.encode(exerciseName, forKey: .exerciseName)
+        try container.encode(exerciseKind, forKey: .exerciseKind)
+        try container.encode(targetWeight, forKey: .targetWeight)
+        try container.encode(targetReps, forKey: .targetReps)
+        try container.encode(restDurationSeconds, forKey: .restDurationSeconds)
+        try container.encode(manuallyAdded, forKey: .manuallyAdded)
+    }
+
+    private static func normalizedWeight(_ weight: Double, for kind: ExerciseKind) -> Double {
+        guard kind == .weighted, weight.isFinite else { return 0 }
+        return max(0, weight)
     }
 }
 
 public struct CompletedSet: Identifiable, Codable, Equatable, Sendable {
     public var setId: String
     public var exerciseName: String
-    public var actualWeight: Double
+    public var exerciseKind: ExerciseKind {
+        didSet {
+            storedActualWeight = Self.normalizedWeight(storedActualWeight, for: exerciseKind)
+        }
+    }
+    private var storedActualWeight: Double
+    public var actualWeight: Double {
+        get { storedActualWeight }
+        set { storedActualWeight = Self.normalizedWeight(newValue, for: exerciseKind) }
+    }
     public var actualReps: Int
     public var completedAt: Date
 
     public var id: String { setId }
 
-    public init(setId: String, exerciseName: String, actualWeight: Double, actualReps: Int, completedAt: Date) {
+    public init(
+        setId: String,
+        exerciseName: String,
+        exerciseKind: ExerciseKind = .weighted,
+        actualWeight: Double,
+        actualReps: Int,
+        completedAt: Date
+    ) {
         self.setId = setId
         self.exerciseName = exerciseName
-        self.actualWeight = max(0, actualWeight)
+        self.exerciseKind = exerciseKind
+        self.storedActualWeight = Self.normalizedWeight(actualWeight, for: exerciseKind)
         self.actualReps = max(0, actualReps)
         self.completedAt = completedAt
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case setId, exerciseName, exerciseKind, actualWeight, actualReps, completedAt
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            setId: try container.decode(String.self, forKey: .setId),
+            exerciseName: try container.decode(String.self, forKey: .exerciseName),
+            exerciseKind: try container.decodeIfPresent(ExerciseKind.self, forKey: .exerciseKind) ?? .weighted,
+            actualWeight: try container.decode(Double.self, forKey: .actualWeight),
+            actualReps: try container.decode(Int.self, forKey: .actualReps),
+            completedAt: try container.decode(Date.self, forKey: .completedAt)
+        )
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(setId, forKey: .setId)
+        try container.encode(exerciseName, forKey: .exerciseName)
+        try container.encode(exerciseKind, forKey: .exerciseKind)
+        try container.encode(actualWeight, forKey: .actualWeight)
+        try container.encode(actualReps, forKey: .actualReps)
+        try container.encode(completedAt, forKey: .completedAt)
+    }
+
+    private static func normalizedWeight(_ weight: Double, for kind: ExerciseKind) -> Double {
+        guard kind == .weighted, weight.isFinite else { return 0 }
+        return max(0, weight)
     }
 }
 
@@ -107,6 +248,11 @@ public enum LockScreenPhase: String, Codable, Equatable, Sendable {
 
 public struct LockScreenState: Codable, Equatable, Sendable {
     public var exerciseName: String
+    public var exerciseKind: ExerciseKind {
+        didSet {
+            storedActualWeight = Self.normalizedWeight(storedActualWeight, for: exerciseKind)
+        }
+    }
     public var currentSetIndex: Int
     public var totalPlannedSets: Int
     public var targetReps: Int
@@ -115,7 +261,11 @@ public struct LockScreenState: Codable, Equatable, Sendable {
     /// recently completed. Keeping this beside `actualReps` lets the app and
     /// Live Activity mutate the same progress instead of maintaining separate
     /// process-local values.
-    public var actualWeight: Double
+    private var storedActualWeight: Double
+    public var actualWeight: Double {
+        get { storedActualWeight }
+        set { storedActualWeight = Self.normalizedWeight(newValue, for: exerciseKind) }
+    }
     public var canCompleteSet: Bool
     public var restRemainingSeconds: Int
     public var resumeAt: Date?
@@ -127,6 +277,7 @@ public struct LockScreenState: Codable, Equatable, Sendable {
 
     public init(
         exerciseName: String,
+        exerciseKind: ExerciseKind = .weighted,
         currentSetIndex: Int,
         totalPlannedSets: Int,
         targetReps: Int,
@@ -138,11 +289,12 @@ public struct LockScreenState: Codable, Equatable, Sendable {
         phase: LockScreenPhase
     ) {
         self.exerciseName = exerciseName
+        self.exerciseKind = exerciseKind
         self.currentSetIndex = max(1, currentSetIndex)
         self.totalPlannedSets = max(1, totalPlannedSets)
         self.targetReps = max(0, targetReps)
         self.actualReps = max(0, actualReps)
-        self.actualWeight = max(0, actualWeight)
+        self.storedActualWeight = Self.normalizedWeight(actualWeight, for: exerciseKind)
         self.canCompleteSet = canCompleteSet
         self.restRemainingSeconds = max(0, restRemainingSeconds)
         self.resumeAt = resumeAt
@@ -152,6 +304,7 @@ public struct LockScreenState: Codable, Equatable, Sendable {
     public static func performing(_ set: PlannedSet, setIndex: Int, totalSets: Int) -> LockScreenState {
         LockScreenState(
             exerciseName: set.exerciseName,
+            exerciseKind: set.exerciseKind,
             currentSetIndex: setIndex,
             totalPlannedSets: totalSets,
             targetReps: set.targetReps,
@@ -174,6 +327,7 @@ public struct LockScreenState: Codable, Equatable, Sendable {
     ) -> LockScreenState {
         LockScreenState(
             exerciseName: set.exerciseName,
+            exerciseKind: set.exerciseKind,
             currentSetIndex: setIndex,
             totalPlannedSets: totalSets,
             targetReps: set.targetReps,
@@ -195,6 +349,7 @@ public struct LockScreenState: Codable, Equatable, Sendable {
     ) -> LockScreenState {
         LockScreenState(
             exerciseName: set.exerciseName,
+            exerciseKind: set.exerciseKind,
             currentSetIndex: setIndex,
             totalPlannedSets: totalSets,
             targetReps: set.targetReps,
@@ -209,6 +364,7 @@ public struct LockScreenState: Codable, Equatable, Sendable {
 
     enum CodingKeys: String, CodingKey {
         case exerciseName
+        case exerciseKind
         case currentSetIndex
         case totalPlannedSets
         case targetReps
@@ -226,16 +382,39 @@ public struct LockScreenState: Codable, Equatable, Sendable {
     /// is available.
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        exerciseName = try container.decode(String.self, forKey: .exerciseName)
-        currentSetIndex = max(1, try container.decode(Int.self, forKey: .currentSetIndex))
-        totalPlannedSets = max(1, try container.decode(Int.self, forKey: .totalPlannedSets))
-        targetReps = max(0, try container.decode(Int.self, forKey: .targetReps))
-        actualReps = max(0, try container.decode(Int.self, forKey: .actualReps))
-        actualWeight = max(0, try container.decodeIfPresent(Double.self, forKey: .actualWeight) ?? 0)
-        canCompleteSet = try container.decode(Bool.self, forKey: .canCompleteSet)
-        restRemainingSeconds = max(0, try container.decode(Int.self, forKey: .restRemainingSeconds))
-        resumeAt = try container.decodeIfPresent(Date.self, forKey: .resumeAt)
-        phase = try container.decode(LockScreenPhase.self, forKey: .phase)
+        self.init(
+            exerciseName: try container.decode(String.self, forKey: .exerciseName),
+            exerciseKind: try container.decodeIfPresent(ExerciseKind.self, forKey: .exerciseKind) ?? .weighted,
+            currentSetIndex: try container.decode(Int.self, forKey: .currentSetIndex),
+            totalPlannedSets: try container.decode(Int.self, forKey: .totalPlannedSets),
+            targetReps: try container.decode(Int.self, forKey: .targetReps),
+            actualReps: try container.decode(Int.self, forKey: .actualReps),
+            actualWeight: try container.decodeIfPresent(Double.self, forKey: .actualWeight) ?? 0,
+            canCompleteSet: try container.decode(Bool.self, forKey: .canCompleteSet),
+            restRemainingSeconds: try container.decode(Int.self, forKey: .restRemainingSeconds),
+            resumeAt: try container.decodeIfPresent(Date.self, forKey: .resumeAt),
+            phase: try container.decode(LockScreenPhase.self, forKey: .phase)
+        )
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(exerciseName, forKey: .exerciseName)
+        try container.encode(exerciseKind, forKey: .exerciseKind)
+        try container.encode(currentSetIndex, forKey: .currentSetIndex)
+        try container.encode(totalPlannedSets, forKey: .totalPlannedSets)
+        try container.encode(targetReps, forKey: .targetReps)
+        try container.encode(actualReps, forKey: .actualReps)
+        try container.encode(actualWeight, forKey: .actualWeight)
+        try container.encode(canCompleteSet, forKey: .canCompleteSet)
+        try container.encode(restRemainingSeconds, forKey: .restRemainingSeconds)
+        try container.encodeIfPresent(resumeAt, forKey: .resumeAt)
+        try container.encode(phase, forKey: .phase)
+    }
+
+    private static func normalizedWeight(_ weight: Double, for kind: ExerciseKind) -> Double {
+        guard kind == .weighted, weight.isFinite else { return 0 }
+        return max(0, weight)
     }
 }
 
@@ -357,7 +536,10 @@ public struct WorkoutSummary: Identifiable, Codable, Equatable, Sendable {
         self.routineName = session.routineName
         self.completedSets = session.completedSets
         self.totalSets = session.completedSets.count
-        self.totalVolume = session.completedSets.reduce(0) { $0 + ($1.actualWeight * Double($1.actualReps)) }
+        self.totalVolume = session.completedSets.reduce(0) { volume, set in
+            guard set.exerciseKind == .weighted else { return volume }
+            return volume + (set.actualWeight * Double(set.actualReps))
+        }
         self.workoutStartTime = session.workoutStartTime
         self.workoutEndTime = endedAt
     }

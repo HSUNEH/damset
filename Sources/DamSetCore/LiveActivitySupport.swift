@@ -7,6 +7,7 @@ import ActivityKit
 public struct DamSetActivityAttributes: ActivityAttributes {
     public struct ContentState: Codable, Hashable {
         public var exerciseName: String
+        public var exerciseKind: String
         public var currentSetIndex: Int
         public var totalPlannedSets: Int
         public var targetReps: Int
@@ -16,8 +17,9 @@ public struct DamSetActivityAttributes: ActivityAttributes {
         public var resumeAt: Date?
         public var phase: String
 
-        public init(exerciseName: String, currentSetIndex: Int, totalPlannedSets: Int, targetReps: Int, actualReps: Int, actualWeight: Double, restRemainingSeconds: Int, resumeAt: Date?, phase: String) {
+        public init(exerciseName: String, exerciseKind: String, currentSetIndex: Int, totalPlannedSets: Int, targetReps: Int, actualReps: Int, actualWeight: Double, restRemainingSeconds: Int, resumeAt: Date?, phase: String) {
             self.exerciseName = exerciseName
+            self.exerciseKind = exerciseKind
             self.currentSetIndex = currentSetIndex
             self.totalPlannedSets = totalPlannedSets
             self.targetReps = targetReps
@@ -31,6 +33,7 @@ public struct DamSetActivityAttributes: ActivityAttributes {
         public init(_ state: LockScreenState) {
             self.init(
                 exerciseName: state.exerciseName,
+                exerciseKind: state.exerciseKind.rawValue,
                 currentSetIndex: state.currentSetIndex,
                 totalPlannedSets: state.totalPlannedSets,
                 targetReps: state.targetReps,
@@ -39,6 +42,29 @@ public struct DamSetActivityAttributes: ActivityAttributes {
                 restRemainingSeconds: state.restRemainingSeconds,
                 resumeAt: state.resumeAt,
                 phase: state.phase.rawValue
+            )
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case exerciseName, exerciseKind, currentSetIndex, totalPlannedSets
+            case targetReps, actualReps, actualWeight, restRemainingSeconds
+            case resumeAt, phase
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self.init(
+                exerciseName: try container.decode(String.self, forKey: .exerciseName),
+                exerciseKind: try container.decodeIfPresent(String.self, forKey: .exerciseKind)
+                    ?? ExerciseKind.weighted.rawValue,
+                currentSetIndex: try container.decode(Int.self, forKey: .currentSetIndex),
+                totalPlannedSets: try container.decode(Int.self, forKey: .totalPlannedSets),
+                targetReps: try container.decode(Int.self, forKey: .targetReps),
+                actualReps: try container.decode(Int.self, forKey: .actualReps),
+                actualWeight: try container.decode(Double.self, forKey: .actualWeight),
+                restRemainingSeconds: try container.decode(Int.self, forKey: .restRemainingSeconds),
+                resumeAt: try container.decodeIfPresent(Date.self, forKey: .resumeAt),
+                phase: try container.decode(String.self, forKey: .phase)
             )
         }
     }
@@ -167,15 +193,18 @@ public enum WorkoutSessionSync {
             RestCueScheduler.cancelPendingCues()
         default:
             try sessionStore.save(session)
-            if session.sessionStatus == .resting,
-               session.lockScreenState.phase == .resting,
-               let resumeAt = session.lockScreenState.resumeAt {
-                RestCueScheduler.scheduleRestEndCue(resumeAt: resumeAt, upcomingExercise: session.nextPlannedSet?.exerciseName)
-            } else if session.lockScreenState.phase == .performingSet {
+            switch RestCueScheduler.plan(for: session) {
+            case .schedule(let resumeAt, let upcomingExercise):
+                RestCueScheduler.scheduleRestEndCue(
+                    resumeAt: resumeAt,
+                    upcomingExercise: upcomingExercise
+                )
+            case .cancel:
                 RestCueScheduler.cancelPendingCues()
             }
         }
     }
+
 }
 
 private enum WorkoutSessionMutationError: Error {

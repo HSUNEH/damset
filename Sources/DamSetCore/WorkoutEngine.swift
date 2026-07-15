@@ -47,6 +47,14 @@ public struct WorkoutEngine: Sendable {
 
     public func adjustActualWeight(session: inout WorkoutRoutineSession, delta: Double) throws {
         try validateEditableProgress(session)
+        guard session.lockScreenState.exerciseKind == .weighted else {
+            session.lockScreenState.actualWeight = 0
+            if session.sessionStatus == .resting,
+               let lastCompletedIndex = session.completedSets.indices.last {
+                session.completedSets[lastCompletedIndex].actualWeight = 0
+            }
+            return
+        }
         let updatedWeight = max(0, session.lockScreenState.actualWeight + delta)
         if session.sessionStatus == .resting,
            let lastCompletedIndex = session.completedSets.indices.last {
@@ -73,6 +81,7 @@ public struct WorkoutEngine: Sendable {
         let completed = CompletedSet(
             setId: planned.setId,
             exerciseName: planned.exerciseName,
+            exerciseKind: planned.exerciseKind,
             actualWeight: session.lockScreenState.actualWeight,
             actualReps: session.lockScreenState.actualReps,
             completedAt: now
@@ -212,10 +221,18 @@ public struct WorkoutEngine: Sendable {
         session.lockScreenState.actualWeight = completed.actualWeight
     }
 
-    public func addSessionScopedSet(session: inout WorkoutRoutineSession, exerciseName: String, targetWeight: Double, targetReps: Int, restDurationSeconds: Int) {
+    public func addSessionScopedSet(
+        session: inout WorkoutRoutineSession,
+        exerciseName: String,
+        exerciseKind: ExerciseKind = .weighted,
+        targetWeight: Double,
+        targetReps: Int,
+        restDurationSeconds: Int
+    ) {
         let planned = PlannedSet(
             setId: "manual-\(UUID().uuidString)",
             exerciseName: exerciseName,
+            exerciseKind: exerciseKind,
             targetWeight: targetWeight,
             targetReps: targetReps,
             restDurationSeconds: restDurationSeconds,
