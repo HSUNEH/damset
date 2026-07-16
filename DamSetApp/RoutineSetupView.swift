@@ -44,7 +44,7 @@ struct RoutineSetupView: View {
             } header: {
                 SectionHeader(
                     title: "Exercises",
-                    subtitle: "Tap a name to edit · drag ≡ to reorder"
+                    subtitle: "Tap a name to edit · drag ≡ to reorder · ← swipe to delete"
                 )
                 .textCase(nil)
             }
