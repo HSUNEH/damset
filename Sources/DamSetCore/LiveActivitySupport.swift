@@ -151,6 +151,14 @@ public enum WorkoutSessionSync {
         try await WorkoutSessionMutationGate.shared.apply(session)
     }
 
+    /// Persists an in-place reps correction and refreshes the Live Activity
+    /// without touching the rest-end notification. Reps changes never alter a
+    /// rest deadline, so avoiding notification IPC keeps Lock Screen +/- taps
+    /// responsive while preserving the already-scheduled countdown cue.
+    public static func applyProgressCorrection(_ session: WorkoutRoutineSession) async throws {
+        try await WorkoutSessionMutationGate.shared.applyProgressCorrection(session)
+    }
+
     /// Ends an in-progress workout without allowing an already-running Live
     /// Activity intent to write its stale snapshot back after the clear.
     public static func discardSession(sessionId: String) async throws {
@@ -187,12 +195,21 @@ public enum WorkoutSessionSync {
             // the completed workout.
             try summaryStore.save(summary)
             try sessionStore.clear()
-            RestCueScheduler.cancelPendingCues()
         case .cancelled:
             try sessionStore.clear()
-            RestCueScheduler.cancelPendingCues()
         default:
             try sessionStore.save(session)
+        }
+    }
+
+    /// Live Activity content is the immediate feedback path for lock-screen
+    /// taps. Refresh notification work only after that content has been sent,
+    /// so scheduling IPC never sits in front of the visible state change.
+    fileprivate static func refreshRestCue(for session: WorkoutRoutineSession) {
+        switch session.sessionStatus {
+        case .completed, .cancelled:
+            RestCueScheduler.cancelPendingCues()
+        default:
             switch RestCueScheduler.plan(for: session) {
             case .schedule(let resumeAt, let upcomingExercise):
                 RestCueScheduler.scheduleRestEndCue(
@@ -253,6 +270,21 @@ private actor WorkoutSessionMutationGate {
                 barriers[session.sessionId] = .closed
             }
         }
+        await WorkoutSessionSync.updateLiveActivity(for: session)
+        WorkoutSessionSync.refreshRestCue(for: session)
+    }
+
+    /// Corrections change only the recorded reps. Keep the existing rest cue
+    /// intact and avoid its notification-center round trip on every +/- tap.
+    func applyProgressCorrection(_ session: WorkoutRoutineSession) async throws {
+        guard barriers[session.sessionId] == nil else { return }
+
+        if session.sessionStatus == .completed || session.sessionStatus == .cancelled {
+            try await apply(session)
+            return
+        }
+
+        try WorkoutSessionSync.sessionStore.save(session)
         await WorkoutSessionSync.updateLiveActivity(for: session)
     }
 
@@ -343,6 +375,7 @@ private actor WorkoutSessionMutationGate {
             throw error
         }
         await WorkoutSessionSync.updateLiveActivity(for: session)
+        WorkoutSessionSync.refreshRestCue(for: session)
         if barriers[session.sessionId] == .reopening {
             barriers.removeValue(forKey: session.sessionId)
         }
