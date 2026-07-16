@@ -9,6 +9,7 @@ struct RoutineSetupView: View {
     @State private var draftEmoji: String
     @State private var draftName: String
     @State private var draftExercises: [EditableExercisePlan]
+    @State private var exerciseEditor: ExerciseEditorContext?
     @State private var routinePendingChooser: RoutineTemplate?
     @State private var showDeleteConfirmation = false
 
@@ -30,16 +31,35 @@ struct RoutineSetupView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 30) {
+        List {
+            Section {
                 headerCard
-                exercisesEditor
-                deleteRoutineButton
+                    .listRowInsets(EdgeInsets(top: 12, leading: 20, bottom: 16, trailing: 20))
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 12)
-            .padding(.bottom, 96)
+
+            Section {
+                exercisesEditor
+            } header: {
+                SectionHeader(
+                    title: "Exercises",
+                    subtitle: "Tap a name to edit · drag ≡ to reorder"
+                )
+                .textCase(nil)
+            }
+
+            Section {
+                deleteRoutineButton
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+            }
         }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+        #if os(iOS)
+        .environment(\.editMode, .constant(.active))
+        #endif
         .background(DamSetDesign.screenBackground.ignoresSafeArea())
         .safeAreaInset(edge: .bottom) {
             startButton
@@ -62,14 +82,25 @@ struct RoutineSetupView: View {
                 }
                 .disabled(!canStart)
                 Button {
-                    addExercise()
+                    presentNewExerciseEditor()
                 } label: {
                     Label("Add Exercise", systemImage: "plus")
                 }
+                .accessibilityLabel("Add exercise")
+            }
+        }
+        .sheet(item: $exerciseEditor) { context in
+            ExerciseEditorSheet(
+                title: context.existingExerciseID == nil ? "Add Exercise" : "Edit Exercise",
+                saveTitle: context.existingExerciseID == nil ? "Add" : "Save",
+                exercise: context.exercise
+            ) { editedExercise in
+                saveExercise(editedExercise, replacing: context.existingExerciseID)
             }
         }
         .tint(DamSetDesign.accent)
         .preferredColorScheme(.dark)
+        .dynamicTypeSize(...DynamicTypeSize.xxLarge)
         .gymNavigationChrome()
         .onDisappear {
             guard let routinePendingChooser else { return }
@@ -114,38 +145,49 @@ struct RoutineSetupView: View {
     }
 
     private var exercisesEditor: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            SectionHeader(title: "Exercises", subtitle: "Weight · reps/set · sets · rest")
-            ForEach($draftExercises) { $exercise in
-                EditableExerciseCard(
-                    exercise: $exercise,
-                    showsExerciseNameError: exercise.exerciseName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-                    canDelete: draftExercises.count > 1,
-                    canMoveUp: draftExercises.first?.id != exercise.id,
-                    canMoveDown: draftExercises.last?.id != exercise.id,
-                    moveUp: { move(exercise, by: -1) },
-                    moveDown: { move(exercise, by: 1) },
-                    duplicate: { duplicate(exercise) },
-                    delete: { delete(exercise) }
-                )
-            }
-            Button {
-                addExercise()
-            } label: {
-                Label("Add exercise", systemImage: "plus")
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(DamSetDesign.accent)
-                    .frame(maxWidth: .infinity, minHeight: 52)
-            }
-            .buttonStyle(.plain)
-            .dynamicTypeSize(...DynamicTypeSize.accessibility2)
-            .background(DamSetDesign.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .stroke(
-                        DamSetDesign.steelMuted,
-                        style: StrokeStyle(lineWidth: 1, dash: [6, 4])
+        Group {
+            if draftExercises.isEmpty {
+                ContentUnavailableView {
+                    Label("No exercises", systemImage: "dumbbell")
+                } description: {
+                    Text("Use the + button above to add an exercise.")
+                }
+                .frame(maxWidth: .infinity, minHeight: 150)
+                .cardSurface(accent: DamSetDesign.steelMuted.opacity(0.65))
+                .listRowInsets(EdgeInsets(top: 4, leading: 20, bottom: 8, trailing: 20))
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+            } else {
+                ForEach(draftExercises) { exercise in
+                    let index = draftExercises.firstIndex(where: { $0.id == exercise.id }) ?? 0
+                    CompactExerciseRow(
+                        exercise: exercise,
+                        order: index + 1,
+                        edit: { presentExerciseEditor(for: exercise) }
                     )
+                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                        Button(role: .destructive) {
+                            delete(exercise)
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
+                    }
+                    .contextMenu {
+                        Button("Edit", systemImage: "pencil") {
+                            presentExerciseEditor(for: exercise)
+                        }
+                        Button("Duplicate", systemImage: "plus.square.on.square") {
+                            duplicate(exercise)
+                        }
+                        Button("Delete", systemImage: "trash", role: .destructive) {
+                            delete(exercise)
+                        }
+                    }
+                    .listRowInsets(EdgeInsets(top: 4, leading: 20, bottom: 4, trailing: 20))
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+                }
+                .onMove(perform: moveExercises)
             }
         }
     }
@@ -232,81 +274,161 @@ struct RoutineSetupView: View {
         dismiss()
     }
 
-    private func addExercise() {
-        draftExercises.append(EditableExercisePlan())
+    private func presentNewExerciseEditor() {
+        exerciseEditor = ExerciseEditorContext(
+            existingExerciseID: nil,
+            exercise: EditableExercisePlan(exerciseName: "")
+        )
+    }
+
+    private func presentExerciseEditor(for exercise: EditableExercisePlan) {
+        exerciseEditor = ExerciseEditorContext(
+            existingExerciseID: exercise.id,
+            exercise: exercise
+        )
+    }
+
+    private func saveExercise(
+        _ editedExercise: EditableExercisePlan,
+        replacing existingExerciseID: String?
+    ) {
+        guard !editedExercise.exerciseName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return
+        }
+
+        if let existingExerciseID,
+           let index = draftExercises.firstIndex(where: { $0.id == existingExerciseID }) {
+            draftExercises[index] = editedExercise
+        } else {
+            draftExercises.append(editedExercise)
+        }
     }
 
     private func duplicate(_ exercise: EditableExercisePlan) {
-        draftExercises.append(exercise.duplicated())
+        guard let index = draftExercises.firstIndex(where: { $0.id == exercise.id }) else { return }
+        draftExercises.insert(exercise.duplicated(), at: index + 1)
     }
 
-    private func move(_ exercise: EditableExercisePlan, by offset: Int) {
-        guard let sourceIndex = draftExercises.firstIndex(where: { $0.id == exercise.id }) else { return }
-        let destinationIndex = sourceIndex + offset
-        guard draftExercises.indices.contains(destinationIndex) else { return }
-
+    private func moveExercises(from source: IndexSet, to destination: Int) {
         withAnimation(.snappy) {
-            draftExercises.swapAt(sourceIndex, destinationIndex)
+            draftExercises.move(fromOffsets: source, toOffset: destination)
         }
     }
 
     private func delete(_ exercise: EditableExercisePlan) {
-        guard draftExercises.count > 1 else { return }
         draftExercises.removeAll { $0.id == exercise.id }
+    }
+}
+
+private struct ExerciseEditorContext: Identifiable {
+    let id = UUID()
+    let existingExerciseID: String?
+    let exercise: EditableExercisePlan
+}
+
+private struct CompactExerciseRow: View {
+    let exercise: EditableExercisePlan
+    let order: Int
+    let edit: () -> Void
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    var body: some View {
+        Button(action: edit) {
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: 8) {
+                    titleRow
+                    summary
+                }
+            } else {
+                HStack(spacing: 12) {
+                    orderBadge
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(exercise.exerciseName)
+                            .font(.headline)
+                            .foregroundStyle(.primary)
+                            .lineLimit(1)
+                        summary
+                    }
+                    Spacer(minLength: 8)
+                    Image(systemName: "pencil")
+                        .font(.footnote.weight(.bold))
+                        .foregroundStyle(DamSetDesign.steel)
+                        .accessibilityHidden(true)
+                }
+            }
+        }
+        .buttonStyle(.plain)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityLabel("Edit \(exercise.exerciseName)")
+        .accessibilityValue(accessibilitySummary)
+        .accessibilityHint("Double-tap to change this exercise. Drag the reorder handle on the right to change its position.")
+        .dynamicTypeSize(...DynamicTypeSize.accessibility2)
+        .cardSurface(cornerRadius: 16)
+    }
+
+    private var titleRow: some View {
+        HStack(spacing: 12) {
+            orderBadge
+            Text(exercise.exerciseName)
+                .font(.headline)
+                .foregroundStyle(.primary)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 8)
+            Image(systemName: "pencil")
+                .font(.footnote.weight(.bold))
+                .foregroundStyle(DamSetDesign.steel)
+                .accessibilityHidden(true)
+        }
+    }
+
+    private var orderBadge: some View {
+        Text("\(order)")
+            .font(.caption.weight(.bold))
+            .monospacedDigit()
+            .foregroundStyle(DamSetDesign.accent)
+            .frame(width: 28, height: 28)
+            .background(DamSetDesign.accent.opacity(0.14), in: Circle())
+            .overlay {
+                Circle()
+                    .stroke(DamSetDesign.accent.opacity(0.55), lineWidth: 1)
+            }
+    }
+
+    private var summary: some View {
+        Text(summaryText)
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+            .lineLimit(dynamicTypeSize.isAccessibilitySize ? 3 : 2)
+            .multilineTextAlignment(.leading)
+    }
+
+    private var summaryText: String {
+        let load = exercise.exerciseKind == .bodyweight
+            ? "Bodyweight"
+            : "\(exercise.targetWeight.formatted(.number.precision(.fractionLength(0...1)))) kg"
+        let rest = exercise.restSeconds == 0 ? "No rest" : "Rest \(exercise.restSeconds.minuteSecondText)"
+        return "\(load) · \(exercise.targetReps) reps × \(exercise.setCount) sets · \(rest)"
+    }
+
+    private var accessibilitySummary: String {
+        let load = exercise.exerciseKind == .bodyweight
+            ? "Bodyweight"
+            : "\(exercise.targetWeight.formatted()) kilograms"
+        let rest = exercise.restSeconds == 0 ? "No rest" : "\(exercise.restSeconds) seconds rest"
+        return "Position \(order). \(load), \(exercise.targetReps) reps for \(exercise.setCount) sets, \(rest)."
     }
 }
 
 private struct EditableExerciseCard: View {
     @Binding var exercise: EditableExercisePlan
-    let showsExerciseNameError: Bool
-    let canDelete: Bool
-    let canMoveUp: Bool
-    let canMoveDown: Bool
-    let moveUp: () -> Void
-    let moveDown: () -> Void
-    let duplicate: () -> Void
-    let delete: () -> Void
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
-            HStack(alignment: .firstTextBaseline) {
-                TextField("Exercise", text: $exercise.exerciseName)
-                    .font(.headline)
-                    .foregroundStyle(.primary)
-                    .tint(DamSetDesign.accent)
-                Spacer()
-                Menu {
-                    Section {
-                        Button("Move Up", systemImage: "arrow.up") { moveUp() }
-                            .disabled(!canMoveUp)
-                        Button("Move Down", systemImage: "arrow.down") { moveDown() }
-                            .disabled(!canMoveDown)
-                    }
-                    Section {
-                        Button("Duplicate", systemImage: "plus.square.on.square") { duplicate() }
-                        Button("Delete", systemImage: "trash", role: .destructive) { delete() }
-                            .disabled(!canDelete)
-                    }
-                } label: {
-                        Image(systemName: "ellipsis")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(DamSetDesign.steel)
-                            .frame(width: 44, height: 44)
-                            .background(DamSetDesign.controlFill, in: Circle())
-                            .overlay {
-                                Circle()
-                                    .stroke(DamSetDesign.steelMuted, lineWidth: 1)
-                            }
-                }
-            }
-
-            if showsExerciseNameError {
-                Label("Exercise name is required", systemImage: "exclamationmark.circle.fill")
-                    .font(.footnote.weight(.semibold))
-                    .foregroundStyle(DamSetDesign.amber)
-                    .accessibilityLabel("Error: Exercise name is required")
-            }
+            TextField("Exercise name", text: $exercise.exerciseName)
+                .font(.headline)
+                .foregroundStyle(.primary)
+                .tint(DamSetDesign.accent)
 
             Picker("Exercise type", selection: $exercise.exerciseKind) {
                 Label("Bodyweight", systemImage: "figure.strengthtraining.functional")
@@ -344,10 +466,7 @@ private struct EditableExerciseCard: View {
             }
         }
         .dynamicTypeSize(...DynamicTypeSize.accessibility2)
-        .cardSurface(
-            cornerRadius: 20,
-            accent: showsExerciseNameError ? DamSetDesign.amber : nil
-        )
+        .cardSurface(cornerRadius: 20)
     }
 
     private var weightField: some View {
@@ -431,6 +550,63 @@ private struct EditableExerciseCard: View {
         }
         guard let seconds else { return }
         exercise.restSeconds = min(86_400, max(0, seconds))
+    }
+}
+
+private struct ExerciseEditorSheet: View {
+    let title: String
+    let saveTitle: String
+    let onSave: (EditableExercisePlan) -> Void
+    @State private var draft: EditableExercisePlan
+    @Environment(\.dismiss) private var dismiss
+
+    init(
+        title: String,
+        saveTitle: String,
+        exercise: EditableExercisePlan,
+        onSave: @escaping (EditableExercisePlan) -> Void
+    ) {
+        self.title = title
+        self.saveTitle = saveTitle
+        self.onSave = onSave
+        _draft = State(initialValue: exercise)
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                EditableExerciseCard(
+                    exercise: $draft
+                )
+                .padding(.horizontal, 20)
+                .padding(.top, 16)
+                .padding(.bottom, 28)
+            }
+            .background(DamSetDesign.screenBackground.ignoresSafeArea())
+            .navigationTitle(title)
+            .inlineNavigationTitle()
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(saveTitle) {
+                        onSave(draft)
+                        dismiss()
+                    }
+                    .disabled(!canSave)
+                }
+            }
+        }
+        .tint(DamSetDesign.accent)
+        .preferredColorScheme(.dark)
+        .dynamicTypeSize(...DynamicTypeSize.xxLarge)
+        .gymNavigationChrome()
+    }
+
+    private var canSave: Bool {
+        !draft.exerciseName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        draft.setCount > 0
     }
 }
 
