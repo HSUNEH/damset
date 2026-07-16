@@ -142,6 +142,119 @@ final class RoutineStoreTests: XCTestCase {
         XCTAssertEqual(set.targetWeight, 0)
     }
 
+    func testExercisePlansGroupAdjacentIdenticalSetsAndRoundTripLosslessly() {
+        let plannedSets = [
+            PlannedSet(
+                setId: "bench-1",
+                exerciseName: "Bench Press",
+                targetWeight: 60,
+                targetReps: 8,
+                restDurationSeconds: 90
+            ),
+            PlannedSet(
+                setId: "bench-2",
+                exerciseName: "Bench Press",
+                targetWeight: 60,
+                targetReps: 8,
+                restDurationSeconds: 90
+            ),
+            PlannedSet(
+                setId: "press-1",
+                exerciseName: "Shoulder Press",
+                targetWeight: 30,
+                targetReps: 10,
+                restDurationSeconds: 75
+            )
+        ]
+
+        let plans = plannedSets.groupedExercisePlans()
+
+        XCTAssertEqual(plans.count, 2)
+        XCTAssertEqual(plans.map(\.exerciseName), ["Bench Press", "Shoulder Press"])
+        XCTAssertEqual(plans.map(\.setCount), [2, 1])
+        XCTAssertEqual(plans.first?.id, "bench-1")
+        XCTAssertEqual(plans.expandedPlannedSets(), plannedSets)
+    }
+
+    func testExercisePlanGroupingDoesNotMergeSeparatedOrDifferentTargets() {
+        let plannedSets = [
+            PlannedSet(setId: "bench-1", exerciseName: "Bench Press", targetWeight: 60, targetReps: 8, restDurationSeconds: 90),
+            PlannedSet(setId: "bench-2", exerciseName: "Bench Press", targetWeight: 65, targetReps: 8, restDurationSeconds: 90),
+            PlannedSet(setId: "row-1", exerciseName: "Row", targetWeight: 50, targetReps: 8, restDurationSeconds: 90),
+            PlannedSet(setId: "bench-3", exerciseName: "Bench Press", targetWeight: 60, targetReps: 8, restDurationSeconds: 90)
+        ]
+
+        let plans = RoutineExercisePlan.group(plannedSets)
+
+        XCTAssertEqual(plans.count, 4)
+        XCTAssertEqual(plans.map(\.setCount), [1, 1, 1, 1])
+        XCTAssertEqual(RoutineExercisePlan.expand(plans), plannedSets)
+    }
+
+    func testExercisePlanPreservesIdsAndGeneratesStableIdsWhenSetCountGrows() throws {
+        let existingSets = [
+            PlannedSet(setId: "squat-original-1", exerciseName: "Squat", targetWeight: 80, targetReps: 5, restDurationSeconds: 120),
+            PlannedSet(setId: "squat-original-2", exerciseName: "Squat", targetWeight: 80, targetReps: 5, restDurationSeconds: 120),
+            PlannedSet(setId: "squat-original-3", exerciseName: "Squat", targetWeight: 80, targetReps: 5, restDurationSeconds: 120)
+        ]
+        var plan = try XCTUnwrap(existingSets.groupedExercisePlans().first)
+
+        plan.setCount = 1
+        XCTAssertEqual(plan.expandedPlannedSets().map(\.setId), ["squat-original-1"])
+
+        plan.setCount = 5
+        let firstExpansion = plan.expandedPlannedSets()
+        plan.targetWeight = 85
+        let secondExpansion = plan.expandedPlannedSets()
+
+        XCTAssertEqual(
+            Array(firstExpansion.map(\.setId).prefix(3)),
+            existingSets.map(\.setId)
+        )
+        XCTAssertEqual(firstExpansion.map(\.setId), secondExpansion.map(\.setId))
+        XCTAssertEqual(Set(firstExpansion.map(\.setId)).count, 5)
+        XCTAssertEqual(secondExpansion.map(\.targetWeight), Array(repeating: 85, count: 5))
+    }
+
+    func testNewExercisePlanExpandsWithNormalizedValuesAndStableIdentity() {
+        var plan = RoutineExercisePlan(
+            id: "new-pull-up",
+            exerciseName: "Pull-Up",
+            exerciseKind: .bodyweight,
+            targetWeight: 75,
+            targetReps: -1,
+            setCount: 0,
+            restDurationSeconds: -10
+        )
+
+        XCTAssertEqual(plan.targetWeight, 0)
+        XCTAssertEqual(plan.targetReps, 0)
+        XCTAssertEqual(plan.setCount, 1)
+        XCTAssertEqual(plan.restDurationSeconds, 0)
+
+        plan.setCount = 3
+        let firstIds = plan.expandedPlannedSets().map(\.setId)
+        let secondIds = plan.expandedPlannedSets().map(\.setId)
+        XCTAssertEqual(firstIds, secondIds)
+        XCTAssertEqual(Set(firstIds).count, 3)
+    }
+
+    func testExercisePlanDoesNotChangeRoutineTemplateJSONSchema() throws {
+        let routine = try XCTUnwrap(RoutineCatalog.defaultRoutines.first)
+        let plans = routine.plannedSets.groupedExercisePlans()
+        var edited = routine
+        edited.plannedSets = plans.expandedPlannedSets()
+
+        let data = try JSONEncoder().encode(edited)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        let plannedSets = try XCTUnwrap(json["plannedSets"] as? [[String: Any]])
+
+        XCTAssertEqual(Set(json.keys), ["routineId", "routineName", "emoji", "plannedSets"])
+        XCTAssertNil(json["exercisePlans"])
+        XCTAssertNil(plannedSets.first?["setCount"])
+        XCTAssertEqual(edited, routine)
+    }
+
     func testWorkoutEngineSeedsAndRecordsZeroWeightForBodyweightSet() throws {
         let routine = RoutineTemplate(
             routineId: "bodyweight-engine",

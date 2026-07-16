@@ -8,7 +8,7 @@ struct RoutineSetupView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var draftEmoji: String
     @State private var draftName: String
-    @State private var draftSets: [EditablePlannedSet]
+    @State private var draftExercises: [EditableExercisePlan]
     @State private var routinePendingChooser: RoutineTemplate?
     @State private var showDeleteConfirmation = false
 
@@ -22,14 +22,18 @@ struct RoutineSetupView: View {
         self.onChooseWorkout = onChooseWorkout
         _draftEmoji = State(initialValue: routine.emoji ?? "🏋️")
         _draftName = State(initialValue: routine.routineName)
-        _draftSets = State(initialValue: routine.plannedSets.map(EditablePlannedSet.init(planned:)))
+        _draftExercises = State(
+            initialValue: routine.plannedSets
+                .groupedExercisePlans()
+                .map(EditableExercisePlan.init(plan:))
+        )
     }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 30) {
                 headerCard
-                setsEditor
+                exercisesEditor
                 deleteRoutineButton
             }
             .padding(.horizontal, 20)
@@ -58,9 +62,9 @@ struct RoutineSetupView: View {
                 }
                 .disabled(!canStart)
                 Button {
-                    addSet()
+                    addExercise()
                 } label: {
-                    Label("Add Set", systemImage: "plus")
+                    Label("Add Exercise", systemImage: "plus")
                 }
             }
         }
@@ -101,7 +105,7 @@ struct RoutineSetupView: View {
                     .foregroundStyle(.primary)
                     .tint(DamSetDesign.accent)
             }
-            Text("\(draftSets.count) sets · \(totalRestMinutes) rest")
+            Text("\(totalSetCount) sets · \(totalRestMinutes) rest")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         }
@@ -109,26 +113,26 @@ struct RoutineSetupView: View {
         .cardSurface(cornerRadius: 20)
     }
 
-    private var setsEditor: some View {
+    private var exercisesEditor: some View {
         VStack(alignment: .leading, spacing: 12) {
-            SectionHeader(title: "Sets", subtitle: "Exercise · type · reps · rest")
-            ForEach($draftSets) { $set in
-                EditableSetCard(
-                    set: $set,
-                    showsExerciseNameError: set.exerciseName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-                    canDelete: draftSets.count > 1,
-                    canMoveUp: draftSets.first?.id != set.id,
-                    canMoveDown: draftSets.last?.id != set.id,
-                    moveUp: { move(set, by: -1) },
-                    moveDown: { move(set, by: 1) },
-                    duplicate: { duplicate(set) },
-                    delete: { delete(set) }
+            SectionHeader(title: "Exercises", subtitle: "Weight · reps/set · sets · rest")
+            ForEach($draftExercises) { $exercise in
+                EditableExerciseCard(
+                    exercise: $exercise,
+                    showsExerciseNameError: exercise.exerciseName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                    canDelete: draftExercises.count > 1,
+                    canMoveUp: draftExercises.first?.id != exercise.id,
+                    canMoveDown: draftExercises.last?.id != exercise.id,
+                    moveUp: { move(exercise, by: -1) },
+                    moveDown: { move(exercise, by: 1) },
+                    duplicate: { duplicate(exercise) },
+                    delete: { delete(exercise) }
                 )
             }
             Button {
-                addSet()
+                addExercise()
             } label: {
-                Label("Add set", systemImage: "plus")
+                Label("Add exercise", systemImage: "plus")
                     .font(.body.weight(.semibold))
                     .foregroundStyle(DamSetDesign.accent)
                     .frame(maxWidth: .infinity, minHeight: 52)
@@ -176,38 +180,37 @@ struct RoutineSetupView: View {
 
     private var canStart: Bool {
         !draftName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-        !draftSets.isEmpty &&
-        draftSets.allSatisfy { !$0.exerciseName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        !draftExercises.isEmpty &&
+        draftExercises.allSatisfy {
+            !$0.exerciseName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+            $0.setCount > 0
+        }
+    }
+
+    private var totalSetCount: Int {
+        draftExercises.reduce(0) { $0 + $1.setCount }
     }
 
     private var totalRestMinutes: String {
-        let seconds = draftSets.dropLast().reduce(0) { $0 + $1.restSeconds }
+        let expandedSets = draftExercises.map(\.plan).expandedPlannedSets()
+        let seconds = expandedSets.dropLast().reduce(0) { $0 + $1.restDurationSeconds }
         return "\(seconds / 60)m"
     }
 
     private func makeRoutine() -> RoutineTemplate? {
         guard canStart else { return nil }
 
-        let validSets = draftSets
-            .enumerated()
-            .map { index, set in
-                PlannedSet(
-                    setId: set.sourceSetId
-                        ?? "\(routine.routineId)-setup-\(index + 1)-\(set.id.uuidString)",
-                    exerciseName: set.exerciseName.trimmingCharacters(in: .whitespacesAndNewlines),
-                    exerciseKind: set.exerciseKind,
-                    targetWeight: set.targetWeight,
-                    targetReps: set.targetReps,
-                    restDurationSeconds: set.restSeconds,
-                    manuallyAdded: set.manuallyAdded
-                )
-            }
+        var plans = draftExercises.map(\.plan)
+        for index in plans.indices {
+            plans[index].exerciseName = plans[index].exerciseName
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+        }
 
         return RoutineTemplate(
             routineId: routine.routineId,
             routineName: draftName.trimmingCharacters(in: .whitespacesAndNewlines),
             emoji: normalizedEmoji,
-            plannedSets: validSets
+            plannedSets: plans.expandedPlannedSets()
         )
     }
 
@@ -229,40 +232,32 @@ struct RoutineSetupView: View {
         dismiss()
     }
 
-    private func addSet() {
-        if let last = draftSets.last {
-            duplicate(last)
-        } else {
-            draftSets.append(EditablePlannedSet())
-        }
+    private func addExercise() {
+        draftExercises.append(EditableExercisePlan())
     }
 
-    private func duplicate(_ set: EditablePlannedSet) {
-        var copy = set
-        copy.id = UUID()
-        copy.sourceSetId = nil
-        copy.manuallyAdded = true
-        draftSets.append(copy)
+    private func duplicate(_ exercise: EditableExercisePlan) {
+        draftExercises.append(exercise.duplicated())
     }
 
-    private func move(_ set: EditablePlannedSet, by offset: Int) {
-        guard let sourceIndex = draftSets.firstIndex(where: { $0.id == set.id }) else { return }
+    private func move(_ exercise: EditableExercisePlan, by offset: Int) {
+        guard let sourceIndex = draftExercises.firstIndex(where: { $0.id == exercise.id }) else { return }
         let destinationIndex = sourceIndex + offset
-        guard draftSets.indices.contains(destinationIndex) else { return }
+        guard draftExercises.indices.contains(destinationIndex) else { return }
 
         withAnimation(.snappy) {
-            draftSets.swapAt(sourceIndex, destinationIndex)
+            draftExercises.swapAt(sourceIndex, destinationIndex)
         }
     }
 
-    private func delete(_ set: EditablePlannedSet) {
-        guard draftSets.count > 1 else { return }
-        draftSets.removeAll { $0.id == set.id }
+    private func delete(_ exercise: EditableExercisePlan) {
+        guard draftExercises.count > 1 else { return }
+        draftExercises.removeAll { $0.id == exercise.id }
     }
 }
 
-private struct EditableSetCard: View {
-    @Binding var set: EditablePlannedSet
+private struct EditableExerciseCard: View {
+    @Binding var exercise: EditableExercisePlan
     let showsExerciseNameError: Bool
     let canDelete: Bool
     let canMoveUp: Bool
@@ -276,7 +271,7 @@ private struct EditableSetCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             HStack(alignment: .firstTextBaseline) {
-                TextField("Exercise", text: $set.exerciseName)
+                TextField("Exercise", text: $exercise.exerciseName)
                     .font(.headline)
                     .foregroundStyle(.primary)
                     .tint(DamSetDesign.accent)
@@ -313,78 +308,38 @@ private struct EditableSetCard: View {
                     .accessibilityLabel("Error: Exercise name is required")
             }
 
-            Picker("Exercise type", selection: $set.exerciseKind) {
+            Picker("Exercise type", selection: $exercise.exerciseKind) {
                 Label("Bodyweight", systemImage: "figure.strengthtraining.functional")
                     .tag(ExerciseKind.bodyweight)
                 Label("Weighted", systemImage: "dumbbell.fill")
                     .tag(ExerciseKind.weighted)
             }
             .pickerStyle(.segmented)
-            .onChange(of: set.exerciseKind) { _, kind in
-                if kind == .bodyweight {
-                    set.targetWeight = 0
-                } else {
-                    set.targetWeight = set.lastWeightedTargetWeight
-                }
-            }
 
             if dynamicTypeSize.isAccessibilitySize {
-                if set.exerciseKind == .weighted {
-                    StepperField(
-                        title: "kg",
-                        value: weightText,
-                        decrement: { set.targetWeight = max(0, set.targetWeight - 2.5) },
-                        increment: { set.targetWeight += 2.5 },
-                        directEntry: updateWeight
-                    )
+                if exercise.exerciseKind == .weighted {
+                    weightField
                     Divider().overlay(DamSetDesign.steelMuted)
                 }
-                StepperField(
-                    title: "reps",
-                    value: "\(set.targetReps)",
-                    decrement: { set.targetReps = max(0, set.targetReps - 1) },
-                    increment: { set.targetReps += 1 },
-                    directEntry: updateReps
-                )
+                repsField
                 Divider().overlay(DamSetDesign.steelMuted)
-                StepperField(
-                    title: "rest",
-                    value: set.restSeconds.minuteSecondText,
-                    decrement: { set.restSeconds = max(0, set.restSeconds - 15) },
-                    increment: { set.restSeconds += 15 },
-                    directEntry: updateRest
-                )
+                setsField
+                Divider().overlay(DamSetDesign.steelMuted)
+                restField
             } else {
-                HStack(spacing: 0) {
-                    if set.exerciseKind == .weighted {
-                        StepperField(
-                            title: "kg",
-                            value: weightText,
-                            decrement: { set.targetWeight = max(0, set.targetWeight - 2.5) },
-                            increment: { set.targetWeight += 2.5 },
-                            directEntry: updateWeight
-                        )
-                        Divider()
-                            .overlay(DamSetDesign.steelMuted)
-                            .frame(height: 48)
+                LazyVGrid(
+                    columns: [
+                        GridItem(.flexible(minimum: 96), spacing: 12),
+                        GridItem(.flexible(minimum: 96), spacing: 12)
+                    ],
+                    spacing: 16
+                ) {
+                    if exercise.exerciseKind == .weighted {
+                        weightField
                     }
-                    StepperField(
-                        title: "reps",
-                        value: "\(set.targetReps)",
-                        decrement: { set.targetReps = max(0, set.targetReps - 1) },
-                        increment: { set.targetReps += 1 },
-                        directEntry: updateReps
-                    )
-                    Divider()
-                        .overlay(DamSetDesign.steelMuted)
-                        .frame(height: 48)
-                    StepperField(
-                        title: "rest",
-                        value: set.restSeconds.minuteSecondText,
-                        decrement: { set.restSeconds = max(0, set.restSeconds - 15) },
-                        increment: { set.restSeconds += 15 },
-                        directEntry: updateRest
-                    )
+                    repsField
+                    setsField
+                    restField
                 }
             }
         }
@@ -395,13 +350,53 @@ private struct EditableSetCard: View {
         )
     }
 
+    private var weightField: some View {
+        StepperField(
+            title: "Weight (kg)",
+            value: weightText,
+            decrement: { exercise.targetWeight = max(0, exercise.targetWeight - 2.5) },
+            increment: { exercise.targetWeight = min(9_999, exercise.targetWeight + 2.5) },
+            directEntry: updateWeight
+        )
+    }
+
+    private var repsField: some View {
+        StepperField(
+            title: "Reps / set",
+            value: "\(exercise.targetReps)",
+            decrement: { exercise.targetReps = max(0, exercise.targetReps - 1) },
+            increment: { exercise.targetReps = min(999, exercise.targetReps + 1) },
+            directEntry: updateReps
+        )
+    }
+
+    private var setsField: some View {
+        StepperField(
+            title: "Sets",
+            value: "\(exercise.setCount)",
+            decrement: { exercise.setCount = max(1, exercise.setCount - 1) },
+            increment: { exercise.setCount = min(99, exercise.setCount + 1) },
+            directEntry: updateSets
+        )
+    }
+
+    private var restField: some View {
+        StepperField(
+            title: "Rest after set",
+            value: exercise.restSeconds.minuteSecondText,
+            decrement: { exercise.restSeconds = max(0, exercise.restSeconds - 15) },
+            increment: { exercise.restSeconds = min(86_400, exercise.restSeconds + 15) },
+            directEntry: updateRest
+        )
+    }
+
     private var weightText: String {
-        "\(set.targetWeight.formatted(.number.precision(.fractionLength(0...1))))"
+        "\(exercise.targetWeight.formatted(.number.precision(.fractionLength(0...1))))"
     }
 
     private func updateWeight(_ rawValue: String) {
         guard let value = parsedWeight(rawValue), value.isFinite else { return }
-        set.targetWeight = min(9_999, max(0, value))
+        exercise.targetWeight = min(9_999, max(0, value))
     }
 
     private func parsedWeight(_ rawValue: String) -> Double? {
@@ -417,7 +412,12 @@ private struct EditableSetCard: View {
 
     private func updateReps(_ rawValue: String) {
         guard let value = Int(rawValue.trimmingCharacters(in: .whitespacesAndNewlines)) else { return }
-        set.targetReps = min(999, max(0, value))
+        exercise.targetReps = min(999, max(0, value))
+    }
+
+    private func updateSets(_ rawValue: String) {
+        guard let value = Int(rawValue.trimmingCharacters(in: .whitespacesAndNewlines)) else { return }
+        exercise.setCount = min(99, max(1, value))
     }
 
     private func updateRest(_ rawValue: String) {
@@ -430,7 +430,7 @@ private struct EditableSetCard: View {
             seconds = Int(trimmed)
         }
         guard let seconds else { return }
-        set.restSeconds = min(86_400, max(0, seconds))
+        exercise.restSeconds = min(86_400, max(0, seconds))
     }
 }
 
@@ -448,6 +448,8 @@ private struct StepperField: View {
             Text(title)
                 .font(.caption)
                 .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
             Button {
                 draftValue = value
                 showsDirectEntry = true
@@ -477,14 +479,14 @@ private struct StepperField: View {
                 .disabled(!isValidDraft)
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text(title == "rest" ? "Enter seconds or mm:ss." : "Enter a number.")
+            Text(title == "Rest after set" ? "Enter seconds or mm:ss." : "Enter a number.")
         }
     }
 
     private var isValidDraft: Bool {
         let trimmed = draftValue.trimmingCharacters(in: .whitespacesAndNewlines)
         switch title {
-        case "kg":
+        case "Weight (kg)":
             let formatter = NumberFormatter()
             formatter.locale = .current
             formatter.numberStyle = .decimal
@@ -493,9 +495,11 @@ private struct StepperField: View {
             }
             let normalized = trimmed.replacingOccurrences(of: ",", with: ".")
             return Double(normalized).map { $0.isFinite && $0 >= 0 } ?? false
-        case "reps":
+        case "Reps / set":
             return Int(trimmed).map { $0 >= 0 } ?? false
-        case "rest":
+        case "Sets":
+            return Int(trimmed).map { $0 >= 1 } ?? false
+        case "Rest after set":
             let parts = trimmed.split(separator: ":", omittingEmptySubsequences: false)
             if parts.count == 2,
                let minutes = Int(parts[0]),
@@ -521,54 +525,95 @@ private struct StepperField: View {
     }
 }
 
-private struct EditablePlannedSet: Identifiable, Equatable {
-    var id: UUID
-    var sourceSetId: String?
-    var exerciseName: String
-    var exerciseKind: ExerciseKind
-    var targetWeight: Double {
-        didSet {
-            if exerciseKind == .weighted {
-                lastWeightedTargetWeight = max(0, targetWeight)
+private struct EditableExercisePlan: Identifiable, Equatable {
+    var plan: RoutineExercisePlan
+    private var lastWeightedTargetWeight: Double
+
+    var id: String { plan.id }
+
+    var exerciseName: String {
+        get { plan.exerciseName }
+        set { plan.exerciseName = newValue }
+    }
+
+    var exerciseKind: ExerciseKind {
+        get { plan.exerciseKind }
+        set {
+            guard newValue != plan.exerciseKind else { return }
+            if newValue == .bodyweight {
+                lastWeightedTargetWeight = plan.targetWeight
+                plan.exerciseKind = .bodyweight
+            } else {
+                plan.exerciseKind = .weighted
+                plan.targetWeight = lastWeightedTargetWeight
             }
         }
     }
-    var lastWeightedTargetWeight: Double
-    var targetReps: Int
-    var restSeconds: Int
-    var manuallyAdded: Bool
+
+    var targetWeight: Double {
+        get { plan.targetWeight }
+        set {
+            let finiteWeight = newValue.isFinite ? newValue : 0
+            plan.targetWeight = min(9_999, max(0, finiteWeight))
+            if plan.exerciseKind == .weighted {
+                lastWeightedTargetWeight = plan.targetWeight
+            }
+        }
+    }
+
+    var targetReps: Int {
+        get { plan.targetReps }
+        set { plan.targetReps = min(999, max(0, newValue)) }
+    }
+
+    var setCount: Int {
+        get { plan.setCount }
+        set { plan.setCount = min(99, max(1, newValue)) }
+    }
+
+    var restSeconds: Int {
+        get { plan.restDurationSeconds }
+        set { plan.restDurationSeconds = min(86_400, max(0, newValue)) }
+    }
 
     init(
-        id: UUID = UUID(),
-        sourceSetId: String? = nil,
         exerciseName: String = "New Exercise",
         exerciseKind: ExerciseKind = .weighted,
         targetWeight: Double = 20,
         targetReps: Int = 8,
+        setCount: Int = 3,
         restSeconds: Int = 90,
         manuallyAdded: Bool = true
     ) {
-        self.id = id
-        self.sourceSetId = sourceSetId
-        self.exerciseName = exerciseName
-        self.exerciseKind = exerciseKind
-        let normalizedWeight = max(0, targetWeight)
-        self.targetWeight = exerciseKind == .bodyweight ? 0 : normalizedWeight
+        let normalizedWeight = min(9_999, max(0, targetWeight.isFinite ? targetWeight : 0))
+        self.plan = RoutineExercisePlan(
+            exerciseName: exerciseName,
+            exerciseKind: exerciseKind,
+            targetWeight: normalizedWeight,
+            targetReps: targetReps,
+            setCount: setCount,
+            restDurationSeconds: restSeconds,
+            manuallyAdded: manuallyAdded
+        )
         self.lastWeightedTargetWeight = exerciseKind == .weighted ? normalizedWeight : 20
-        self.targetReps = max(0, targetReps)
-        self.restSeconds = max(0, restSeconds)
-        self.manuallyAdded = manuallyAdded
     }
 
-    init(planned: PlannedSet) {
-        self.init(
-            sourceSetId: planned.setId,
-            exerciseName: planned.exerciseName,
-            exerciseKind: planned.exerciseKind,
-            targetWeight: planned.targetWeight,
-            targetReps: planned.targetReps,
-            restSeconds: planned.restDurationSeconds,
-            manuallyAdded: planned.manuallyAdded
+    init(plan: RoutineExercisePlan) {
+        self.plan = plan
+        self.lastWeightedTargetWeight = plan.exerciseKind == .weighted ? plan.targetWeight : 20
+    }
+
+    func duplicated() -> EditableExercisePlan {
+        var copy = EditableExercisePlan(
+            exerciseName: exerciseName,
+            exerciseKind: exerciseKind,
+            targetWeight: targetWeight,
+            targetReps: targetReps,
+            setCount: setCount,
+            restSeconds: restSeconds,
+            manuallyAdded: true
         )
+        copy.lastWeightedTargetWeight = lastWeightedTargetWeight
+        return copy
     }
 }

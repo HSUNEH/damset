@@ -165,6 +165,155 @@ public struct PlannedSet: Identifiable, Codable, Equatable, Sendable {
     }
 }
 
+/// Transient, exercise-level representation used while editing a routine.
+/// Persistence continues to use `RoutineTemplate.plannedSets`; expanding this
+/// value produces that existing schema without adding any JSON fields.
+public struct RoutineExercisePlan: Identifiable, Equatable, Sendable {
+    public let id: String
+    public var exerciseName: String
+    public var exerciseKind: ExerciseKind {
+        didSet {
+            storedTargetWeight = Self.normalizedWeight(storedTargetWeight, for: exerciseKind)
+        }
+    }
+    private var storedTargetWeight: Double
+    public var targetWeight: Double {
+        get { storedTargetWeight }
+        set { storedTargetWeight = Self.normalizedWeight(newValue, for: exerciseKind) }
+    }
+    public var targetReps: Int {
+        didSet { targetReps = max(0, targetReps) }
+    }
+    public var setCount: Int {
+        didSet { setCount = max(1, setCount) }
+    }
+    public var restDurationSeconds: Int {
+        didSet { restDurationSeconds = max(0, restDurationSeconds) }
+    }
+    public var manuallyAdded: Bool
+
+    // Kept even when setCount is temporarily reduced so increasing it again
+    // during the same edit restores the original set identities.
+    private var preservedSetIds: [String]
+
+    public init(
+        id: String = UUID().uuidString,
+        exerciseName: String,
+        exerciseKind: ExerciseKind = .weighted,
+        targetWeight: Double,
+        targetReps: Int,
+        setCount: Int = 1,
+        restDurationSeconds: Int,
+        manuallyAdded: Bool = false
+    ) {
+        self.id = id
+        self.exerciseName = exerciseName
+        self.exerciseKind = exerciseKind
+        self.storedTargetWeight = Self.normalizedWeight(targetWeight, for: exerciseKind)
+        self.targetReps = max(0, targetReps)
+        self.setCount = max(1, setCount)
+        self.restDurationSeconds = max(0, restDurationSeconds)
+        self.manuallyAdded = manuallyAdded
+        self.preservedSetIds = []
+    }
+
+    /// Groups only adjacent sets with the same editable values. This makes the
+    /// conversion lossless when one exercise uses different targets per set.
+    public static func group(_ plannedSets: [PlannedSet]) -> [RoutineExercisePlan] {
+        var plans: [RoutineExercisePlan] = []
+        plans.reserveCapacity(plannedSets.count)
+
+        for plannedSet in plannedSets {
+            if let lastIndex = plans.indices.last,
+               plans[lastIndex].hasSameEditableValues(as: plannedSet) {
+                plans[lastIndex].appendPreservedSetId(plannedSet.setId)
+            } else {
+                plans.append(RoutineExercisePlan(plannedSet: plannedSet))
+            }
+        }
+        return plans
+    }
+
+    public static func expand(_ plans: [RoutineExercisePlan]) -> [PlannedSet] {
+        plans.flatMap { $0.expandedPlannedSets() }
+    }
+
+    /// Existing identities are reused first. Additional identities are derived
+    /// from the stable plan id and set position, so repeated expansion is stable.
+    public func expandedPlannedSets() -> [PlannedSet] {
+        (0..<setCount).map { index in
+            PlannedSet(
+                setId: setId(at: index),
+                exerciseName: exerciseName,
+                exerciseKind: exerciseKind,
+                targetWeight: targetWeight,
+                targetReps: targetReps,
+                restDurationSeconds: restDurationSeconds,
+                manuallyAdded: manuallyAdded
+            )
+        }
+    }
+
+    private init(plannedSet: PlannedSet) {
+        self.id = plannedSet.setId
+        self.exerciseName = plannedSet.exerciseName
+        self.exerciseKind = plannedSet.exerciseKind
+        self.storedTargetWeight = plannedSet.targetWeight
+        self.targetReps = plannedSet.targetReps
+        self.setCount = 1
+        self.restDurationSeconds = plannedSet.restDurationSeconds
+        self.manuallyAdded = plannedSet.manuallyAdded
+        self.preservedSetIds = [plannedSet.setId]
+    }
+
+    private func hasSameEditableValues(as plannedSet: PlannedSet) -> Bool {
+        exerciseName == plannedSet.exerciseName
+            && exerciseKind == plannedSet.exerciseKind
+            && targetWeight == plannedSet.targetWeight
+            && targetReps == plannedSet.targetReps
+            && restDurationSeconds == plannedSet.restDurationSeconds
+            && manuallyAdded == plannedSet.manuallyAdded
+    }
+
+    private mutating func appendPreservedSetId(_ setId: String) {
+        preservedSetIds.append(setId)
+        setCount = preservedSetIds.count
+    }
+
+    private func setId(at index: Int) -> String {
+        if preservedSetIds.indices.contains(index) {
+            return preservedSetIds[index]
+        }
+
+        let base = "\(id)-generated-set-\(index + 1)"
+        var candidate = base
+        var collisionIndex = 2
+        let reservedIds = Set(preservedSetIds)
+        while reservedIds.contains(candidate) {
+            candidate = "\(base)-\(collisionIndex)"
+            collisionIndex += 1
+        }
+        return candidate
+    }
+
+    private static func normalizedWeight(_ weight: Double, for kind: ExerciseKind) -> Double {
+        guard kind == .weighted, weight.isFinite else { return 0 }
+        return max(0, weight)
+    }
+}
+
+public extension Array where Element == PlannedSet {
+    func groupedExercisePlans() -> [RoutineExercisePlan] {
+        RoutineExercisePlan.group(self)
+    }
+}
+
+public extension Array where Element == RoutineExercisePlan {
+    func expandedPlannedSets() -> [PlannedSet] {
+        RoutineExercisePlan.expand(self)
+    }
+}
+
 public struct CompletedSet: Identifiable, Codable, Equatable, Sendable {
     public var setId: String
     public var exerciseName: String
