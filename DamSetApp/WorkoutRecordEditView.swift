@@ -46,7 +46,7 @@ struct WorkoutRecordEditView: View {
                 } header: {
                     Text("Completed Sets")
                 } footer: {
-                    Text("Edit load or reps. Saving recalculates total sets, volume, and every progress graph.")
+                    Text("Edit load, reps, or time. Saving recalculates total sets, volume, and every progress graph.")
                 }
             }
             .scrollContentBackground(.hidden)
@@ -80,7 +80,8 @@ struct WorkoutRecordEditView: View {
         sets.allSatisfy {
             $0.actualWeight.isFinite &&
             (0...EditableCompletedSet.maximumWeight).contains($0.actualWeight) &&
-            (0...EditableCompletedSet.maximumReps).contains($0.actualReps)
+            (0...EditableCompletedSet.maximumReps).contains($0.actualReps) &&
+            (0...EditableCompletedSet.maximumDurationSeconds).contains($0.actualDurationSeconds)
         }
     }
 
@@ -101,7 +102,9 @@ struct WorkoutRecordEditView: View {
                 exerciseKind: draft.exerciseKind,
                 actualWeight: draft.actualWeight,
                 actualReps: draft.actualReps,
-                completedAt: draft.completedAt.addingTimeInterval(timeShift)
+                completedAt: draft.completedAt.addingTimeInterval(timeShift),
+                trackingMode: draft.trackingMode,
+                actualDurationSeconds: draft.actualDurationSeconds
             )
         }
 
@@ -129,7 +132,7 @@ private struct CompletedSetEditorCard: View {
                     Text(set.exerciseName)
                         .font(.headline)
                         .foregroundStyle(.primary)
-                    Text(set.exerciseKind == .bodyweight ? "Bodyweight" : "Weighted")
+                    Text(exerciseDescriptor)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -149,11 +152,11 @@ private struct CompletedSetEditorCard: View {
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: 12) {
                     loadField
-                    repsField
+                    primaryMetricField
                 }
                 VStack(spacing: 12) {
                     loadField
-                    repsField
+                    primaryMetricField
                 }
             }
         }
@@ -197,6 +200,21 @@ private struct CompletedSetEditorCard: View {
         }
     }
 
+    private var exerciseDescriptor: String {
+        let load = set.exerciseKind == .bodyweight ? "Bodyweight" : "Weighted"
+        return set.trackingMode == .duration ? "\(load) · Timed" : load
+    }
+
+    @ViewBuilder
+    private var primaryMetricField: some View {
+        switch set.trackingMode {
+        case .reps:
+            repsField
+        case .duration:
+            durationField
+        }
+    }
+
     private var repsField: some View {
         VStack(alignment: .leading, spacing: 5) {
             Text("REPS")
@@ -213,6 +231,17 @@ private struct CompletedSetEditorCard: View {
                         EditableCompletedSet.maximumReps
                     )
                 }
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private var durationField: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text("TIME (MM:SS)")
+                .font(.caption2.weight(.bold))
+                .foregroundStyle(.secondary)
+            DurationEntryField(seconds: $set.actualDurationSeconds)
+                .frame(minHeight: 44)
         }
         .frame(maxWidth: .infinity)
     }
@@ -241,21 +270,107 @@ private extension View {
 private struct EditableCompletedSet: Identifiable {
     static let maximumWeight = 2_000.0
     static let maximumReps = 9_999
+    static let maximumDurationSeconds = 86_400
 
     var id = UUID()
     var sourceSetId: String
     var exerciseName: String
     var exerciseKind: ExerciseKind
+    var trackingMode: ExerciseTrackingMode
     var actualWeight: Double
     var actualReps: Int
+    var actualDurationSeconds: Int
     var completedAt: Date
 
     init(_ set: CompletedSet) {
         sourceSetId = set.setId
         exerciseName = set.exerciseName
         exerciseKind = set.exerciseKind
+        trackingMode = set.trackingMode
         actualWeight = set.actualWeight
         actualReps = set.actualReps
+        actualDurationSeconds = set.actualDurationSeconds
         completedAt = set.completedAt
+    }
+}
+
+/// A typed time field instead of a seconds-only number field. It accepts
+/// either seconds (for example, `90`) or `mm:ss` (for example, `01:30`).
+/// The bound record updates as soon as the input becomes valid, so tapping
+/// Save while the keyboard is still open never drops a just-entered value.
+private struct DurationEntryField: View {
+    @Binding private var seconds: Int
+    @State private var draft: String
+    @FocusState private var isFocused: Bool
+
+    init(seconds: Binding<Int>) {
+        _seconds = seconds
+        _draft = State(initialValue: seconds.wrappedValue.minuteSecondText)
+    }
+
+    var body: some View {
+        input
+            .textFieldStyle(.roundedBorder)
+            .monospacedDigit()
+            .focused($isFocused)
+            .accessibilityLabel("Actual duration")
+            .accessibilityHint("Enter seconds or minutes and seconds")
+            .onChange(of: draft) { _, rawValue in
+                guard let parsed = durationSeconds(from: rawValue) else { return }
+                seconds = parsed
+            }
+            .onChange(of: seconds) { _, updatedSeconds in
+                guard !isFocused else { return }
+                draft = updatedSeconds.minuteSecondText
+            }
+            .onChange(of: isFocused) { _, focused in
+                if !focused {
+                    normalizeDraft()
+                }
+            }
+            .onSubmit(normalizeDraft)
+    }
+
+    @ViewBuilder
+    private var input: some View {
+        #if os(iOS)
+        TextField("MM:SS", text: $draft)
+            .keyboardType(.numbersAndPunctuation)
+            .toolbar {
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Done") {
+                        isFocused = false
+                    }
+                }
+            }
+        #else
+        TextField("MM:SS", text: $draft)
+        #endif
+    }
+
+    private func normalizeDraft() {
+        guard let parsed = durationSeconds(from: draft) else {
+            draft = seconds.minuteSecondText
+            return
+        }
+        seconds = parsed
+        draft = parsed.minuteSecondText
+    }
+
+    private func durationSeconds(from rawValue: String) -> Int? {
+        let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        let parts = trimmed.split(separator: ":", omittingEmptySubsequences: false)
+        let parsed: Int?
+        if parts.count == 2,
+           let minutes = Int(parts[0]),
+           let remainder = Int(parts[1]) {
+            parsed = min(max(0, minutes), 1_440) * 60 + min(max(0, remainder), 59)
+        } else {
+            parsed = Int(trimmed)
+        }
+        return parsed.map { min(EditableCompletedSet.maximumDurationSeconds, max(0, $0)) }
     }
 }

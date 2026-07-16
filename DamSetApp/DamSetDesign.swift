@@ -393,18 +393,54 @@ extension WorkoutSummary {
         completedSets.contains { $0.exerciseKind == .bodyweight }
     }
 
+    var hasDurationSets: Bool {
+        completedSets.contains { $0.trackingMode == .duration }
+    }
+
+    var hasWeightedRepetitionSets: Bool {
+        completedSets.contains {
+            $0.exerciseKind == .weighted && $0.trackingMode == .reps
+        }
+    }
+
+    var hasBodyweightRepetitionSets: Bool {
+        completedSets.contains {
+            $0.exerciseKind == .bodyweight && $0.trackingMode == .reps
+        }
+    }
+
+    var totalRecordedDurationSeconds: Int {
+        completedSets.reduce(0) { total, set in
+            total + (set.trackingMode == .duration ? set.actualDurationSeconds : 0)
+        }
+    }
+
+    var timedWorkText: String? {
+        guard hasDurationSets else { return nil }
+        return "\(totalRecordedDurationSeconds.minuteSecondText) timed"
+    }
+
     /// A zero-kilogram weighted set is still weighted training. Derive this
     /// label from the exercise kind instead of guessing from total volume.
     var compactTrainingLoadText: String {
-        switch (hasWeightedSets, hasBodyweightSets) {
+        let repetitionLoadText: String?
+        switch (hasWeightedRepetitionSets, hasBodyweightRepetitionSets) {
         case (true, true):
-            return "\(totalVolume.formatted()) kg + bodyweight"
+            repetitionLoadText = "\(totalVolume.formatted()) kg + bodyweight"
         case (true, false):
-            return "\(totalVolume.formatted()) kg"
+            repetitionLoadText = "\(totalVolume.formatted()) kg"
         case (false, true):
-            return "Bodyweight"
+            repetitionLoadText = "Bodyweight"
         case (false, false):
-            return "No completed sets"
+            repetitionLoadText = nil
         }
+
+        guard let timedWorkText else {
+            return repetitionLoadText ?? "No completed sets"
+        }
+        // Time-only holds and carries have no meaningful rep-volume figure.
+        // Avoid presenting a misleading \"0 kg\" in calendar/history rows.
+        guard let repetitionLoadText else { return timedWorkText }
+        return "\(repetitionLoadText) · \(timedWorkText)"
     }
 }

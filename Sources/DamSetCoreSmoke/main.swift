@@ -105,4 +105,29 @@ try sessionStore.clear()
 let clearedSession = try ActiveSessionStore(fileURL: sessionURL).load()
 expect(clearedSession == nil, "clear removes the shared session")
 
+// Duration-based work uses the same session state machine while keeping its
+// primary progress independent from repetitions.
+let durationRoutine = RoutineTemplate(
+    routineId: "duration-smoke",
+    routineName: "Core",
+    plannedSets: [
+        PlannedSet(
+            setId: "plank-1",
+            exerciseName: "Plank",
+            exerciseKind: .bodyweight,
+            targetWeight: 0,
+            targetReps: 0,
+            trackingMode: .duration,
+            targetDurationSeconds: 60,
+            restDurationSeconds: 0
+        )
+    ]
+)
+var durationSession = try engine.startSession(routine: durationRoutine, sessionId: "duration-smoke")
+expect(durationSession.lockScreenState.actualDurationSeconds == 60, "duration set starts at its target")
+try engine.adjustActualDuration(session: &durationSession, deltaSeconds: -5)
+try engine.completeCurrentSet(session: &durationSession)
+expect(durationSession.completedSets.first?.actualDurationSeconds == 55, "duration completion preserves actual time")
+expect(durationSession.completedSets.first?.trackingMode == .duration, "duration completion preserves tracking mode")
+
 print("DamSetCoreSmoke ok")

@@ -8,10 +8,13 @@ public struct DamSetActivityAttributes: ActivityAttributes {
     public struct ContentState: Codable, Hashable {
         public var exerciseName: String
         public var exerciseKind: String
+        public var trackingMode: String
         public var currentSetIndex: Int
         public var totalPlannedSets: Int
         public var targetReps: Int
         public var actualReps: Int
+        public var targetDurationSeconds: Int
+        public var actualDurationSeconds: Int
         public var actualWeight: Double
         public var restRemainingSeconds: Int
         public var resumeAt: Date?
@@ -20,38 +23,50 @@ public struct DamSetActivityAttributes: ActivityAttributes {
         /// itself at the deadline even while iOS has suspended the app.
         public var nextExerciseName: String?
         public var nextExerciseKind: String?
+        public var nextTrackingMode: String?
         public var nextTargetReps: Int?
+        public var nextTargetDurationSeconds: Int?
         public var nextTargetWeight: Double?
 
         public init(
             exerciseName: String,
             exerciseKind: String,
+            trackingMode: String = ExerciseTrackingMode.reps.rawValue,
             currentSetIndex: Int,
             totalPlannedSets: Int,
             targetReps: Int,
             actualReps: Int,
+            targetDurationSeconds: Int = 0,
+            actualDurationSeconds: Int = 0,
             actualWeight: Double,
             restRemainingSeconds: Int,
             resumeAt: Date?,
             phase: String,
             nextExerciseName: String? = nil,
             nextExerciseKind: String? = nil,
+            nextTrackingMode: String? = nil,
             nextTargetReps: Int? = nil,
+            nextTargetDurationSeconds: Int? = nil,
             nextTargetWeight: Double? = nil
         ) {
             self.exerciseName = exerciseName
             self.exerciseKind = exerciseKind
+            self.trackingMode = trackingMode
             self.currentSetIndex = currentSetIndex
             self.totalPlannedSets = totalPlannedSets
             self.targetReps = targetReps
             self.actualReps = actualReps
+            self.targetDurationSeconds = targetDurationSeconds
+            self.actualDurationSeconds = actualDurationSeconds
             self.actualWeight = actualWeight
             self.restRemainingSeconds = restRemainingSeconds
             self.resumeAt = resumeAt
             self.phase = phase
             self.nextExerciseName = nextExerciseName
             self.nextExerciseKind = nextExerciseKind
+            self.nextTrackingMode = nextTrackingMode
             self.nextTargetReps = nextTargetReps
+            self.nextTargetDurationSeconds = nextTargetDurationSeconds
             self.nextTargetWeight = nextTargetWeight
         }
 
@@ -59,17 +74,22 @@ public struct DamSetActivityAttributes: ActivityAttributes {
             self.init(
                 exerciseName: state.exerciseName,
                 exerciseKind: state.exerciseKind.rawValue,
+                trackingMode: state.trackingMode.rawValue,
                 currentSetIndex: state.currentSetIndex,
                 totalPlannedSets: state.totalPlannedSets,
                 targetReps: state.targetReps,
                 actualReps: state.actualReps,
+                targetDurationSeconds: state.targetDurationSeconds,
+                actualDurationSeconds: state.actualDurationSeconds,
                 actualWeight: state.actualWeight,
                 restRemainingSeconds: state.restRemainingSeconds,
                 resumeAt: state.resumeAt,
                 phase: state.phase.rawValue,
                 nextExerciseName: nextSet?.exerciseName,
                 nextExerciseKind: nextSet?.exerciseKind.rawValue,
+                nextTrackingMode: nextSet?.trackingMode.rawValue,
                 nextTargetReps: nextSet?.targetReps,
+                nextTargetDurationSeconds: nextSet?.targetDurationSeconds,
                 nextTargetWeight: nextSet?.targetWeight
             )
         }
@@ -79,10 +99,12 @@ public struct DamSetActivityAttributes: ActivityAttributes {
         }
 
         private enum CodingKeys: String, CodingKey {
-            case exerciseName, exerciseKind, currentSetIndex, totalPlannedSets
-            case targetReps, actualReps, actualWeight, restRemainingSeconds
+            case exerciseName, exerciseKind, trackingMode, currentSetIndex, totalPlannedSets
+            case targetReps, actualReps, targetDurationSeconds, actualDurationSeconds
+            case actualWeight, restRemainingSeconds
             case resumeAt, phase
-            case nextExerciseName, nextExerciseKind, nextTargetReps, nextTargetWeight
+            case nextExerciseName, nextExerciseKind, nextTrackingMode
+            case nextTargetReps, nextTargetDurationSeconds, nextTargetWeight
         }
 
         public init(from decoder: Decoder) throws {
@@ -91,17 +113,23 @@ public struct DamSetActivityAttributes: ActivityAttributes {
                 exerciseName: try container.decode(String.self, forKey: .exerciseName),
                 exerciseKind: try container.decodeIfPresent(String.self, forKey: .exerciseKind)
                     ?? ExerciseKind.weighted.rawValue,
+                trackingMode: try container.decodeIfPresent(String.self, forKey: .trackingMode)
+                    ?? ExerciseTrackingMode.reps.rawValue,
                 currentSetIndex: try container.decode(Int.self, forKey: .currentSetIndex),
                 totalPlannedSets: try container.decode(Int.self, forKey: .totalPlannedSets),
                 targetReps: try container.decode(Int.self, forKey: .targetReps),
                 actualReps: try container.decode(Int.self, forKey: .actualReps),
+                targetDurationSeconds: try container.decodeIfPresent(Int.self, forKey: .targetDurationSeconds) ?? 0,
+                actualDurationSeconds: try container.decodeIfPresent(Int.self, forKey: .actualDurationSeconds) ?? 0,
                 actualWeight: try container.decode(Double.self, forKey: .actualWeight),
                 restRemainingSeconds: try container.decode(Int.self, forKey: .restRemainingSeconds),
                 resumeAt: try container.decodeIfPresent(Date.self, forKey: .resumeAt),
                 phase: try container.decode(String.self, forKey: .phase),
                 nextExerciseName: try container.decodeIfPresent(String.self, forKey: .nextExerciseName),
                 nextExerciseKind: try container.decodeIfPresent(String.self, forKey: .nextExerciseKind),
+                nextTrackingMode: try container.decodeIfPresent(String.self, forKey: .nextTrackingMode),
                 nextTargetReps: try container.decodeIfPresent(Int.self, forKey: .nextTargetReps),
+                nextTargetDurationSeconds: try container.decodeIfPresent(Int.self, forKey: .nextTargetDurationSeconds),
                 nextTargetWeight: try container.decodeIfPresent(Double.self, forKey: .nextTargetWeight)
             )
         }
@@ -189,10 +217,10 @@ public enum WorkoutSessionSync {
         try await WorkoutSessionMutationGate.shared.apply(session)
     }
 
-    /// Persists an in-place reps correction and refreshes the Live Activity
-    /// without touching the rest-end notification. Reps changes never alter a
-    /// rest deadline, so avoiding notification IPC keeps Lock Screen +/- taps
-    /// responsive while preserving the already-scheduled countdown cue.
+    /// Persists an in-place reps or duration correction and refreshes the Live
+    /// Activity without touching the rest-end notification. Progress changes
+    /// never alter a rest deadline, so avoiding notification IPC keeps Lock
+    /// Screen +/- taps responsive while preserving the countdown cue.
     public static func applyProgressCorrection(_ session: WorkoutRoutineSession) async throws {
         try await WorkoutSessionMutationGate.shared.applyProgressCorrection(session)
     }
@@ -313,8 +341,9 @@ private actor WorkoutSessionMutationGate {
         await WorkoutSessionSync.updateLiveActivity(for: session)
     }
 
-    /// Corrections change only the recorded reps. Keep the existing rest cue
-    /// intact and avoid its notification-center round trip on every +/- tap.
+    /// Corrections change only the recorded reps or time. Keep the existing
+    /// rest cue intact and avoid its notification-center round trip on every
+    /// +/- tap.
     func applyProgressCorrection(_ session: WorkoutRoutineSession) async throws {
         guard barriers[session.sessionId] == nil else { return }
 

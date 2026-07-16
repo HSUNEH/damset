@@ -15,6 +15,7 @@ import DamSetCore
 /// rest correct the set that was just completed.
 private enum LockScreenAction: Sendable {
     case adjustReps(Int)
+    case adjustDuration(Int)
     case completeSet
     case advanceToNextSet
 }
@@ -36,6 +37,14 @@ private actor LockScreenActionCoordinator {
         switch action {
         case .adjustReps(let delta):
             try engine.adjustActualReps(session: &session, delta: delta)
+            if restPhaseChanged {
+                try await WorkoutSessionSync.applyDidChange(session)
+            } else {
+                try await WorkoutSessionSync.applyProgressCorrection(session)
+            }
+            return
+        case .adjustDuration(let deltaSeconds):
+            try engine.adjustActualDuration(session: &session, deltaSeconds: deltaSeconds)
             if restPhaseChanged {
                 try await WorkoutSessionSync.applyDidChange(session)
             } else {
@@ -81,6 +90,32 @@ struct AdjustRepsIntent: LiveActivityIntent {
         try await LockScreenActionCoordinator.shared.perform(
             sessionId: sessionId,
             action: .adjustReps(delta)
+        )
+        return .result()
+    }
+}
+
+struct AdjustDurationIntent: LiveActivityIntent {
+    static let title: LocalizedStringResource = "Adjust Time"
+    static let isDiscoverable = false
+
+    @Parameter(title: "Session ID") var sessionId: String
+    @Parameter(title: "Seconds") var deltaSeconds: Int
+
+    init() {
+        self.sessionId = ""
+        self.deltaSeconds = 0
+    }
+
+    init(sessionId: String, deltaSeconds: Int) {
+        self.sessionId = sessionId
+        self.deltaSeconds = deltaSeconds
+    }
+
+    func perform() async throws -> some IntentResult {
+        try await LockScreenActionCoordinator.shared.perform(
+            sessionId: sessionId,
+            action: .adjustDuration(deltaSeconds)
         )
         return .result()
     }

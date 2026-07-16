@@ -4,6 +4,7 @@ import Foundation
 public enum WorkoutProgressMetric: String, CaseIterable, Codable, Equatable, Hashable, Sendable {
     case weight
     case reps
+    case duration
 }
 
 /// One workout's best value for an exercise and metric.
@@ -39,17 +40,20 @@ public struct ExerciseProgressSeries: Identifiable, Equatable, Sendable {
     public let exerciseName: String
     public let weightPoints: [WorkoutProgressPoint]
     public let repsPoints: [WorkoutProgressPoint]
+    public let durationPoints: [WorkoutProgressPoint]
 
     public var id: String { exerciseName }
 
     public init(
         exerciseName: String,
         weightPoints: [WorkoutProgressPoint],
-        repsPoints: [WorkoutProgressPoint]
+        repsPoints: [WorkoutProgressPoint],
+        durationPoints: [WorkoutProgressPoint] = []
     ) {
         self.exerciseName = exerciseName
         self.weightPoints = weightPoints
         self.repsPoints = repsPoints
+        self.durationPoints = durationPoints
     }
 
     public func points(for metric: WorkoutProgressMetric) -> [WorkoutProgressPoint] {
@@ -58,6 +62,8 @@ public struct ExerciseProgressSeries: Identifiable, Equatable, Sendable {
             return weightPoints
         case .reps:
             return repsPoints
+        case .duration:
+            return durationPoints
         }
     }
 }
@@ -101,6 +107,12 @@ public struct WorkoutProgressAnalysis: Equatable, Sendable {
                 repsPoints: Self.points(
                     for: exerciseName,
                     metric: .reps,
+                    selectedSessionId: selectedSummary.sessionId,
+                    workouts: matchingWorkouts
+                ),
+                durationPoints: Self.points(
+                    for: exerciseName,
+                    metric: .duration,
                     selectedSessionId: selectedSummary.sessionId,
                     workouts: matchingWorkouts
                 )
@@ -203,7 +215,15 @@ public struct WorkoutProgressAnalysis: Equatable, Sendable {
                     .map(\.actualWeight)
                     .max()
             case .reps:
-                value = matchingSets.map { Double($0.actualReps) }.max()
+                value = matchingSets
+                    .filter { $0.trackingMode == .reps }
+                    .map { Double($0.actualReps) }
+                    .max()
+            case .duration:
+                value = matchingSets
+                    .filter { $0.trackingMode == .duration }
+                    .map { Double($0.actualDurationSeconds) }
+                    .max()
             }
 
             guard let value else { return nil }

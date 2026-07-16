@@ -317,7 +317,8 @@ struct RoutineSetupView: View {
         !draftExercises.isEmpty &&
         draftExercises.allSatisfy {
             !$0.exerciseName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-            $0.setCount > 0
+            $0.setCount > 0 &&
+            ($0.trackingMode == .reps || $0.targetDurationSeconds > 0)
         }
     }
 
@@ -612,16 +613,22 @@ private struct CompactExerciseRow: View {
         let load = exercise.exerciseKind == .bodyweight
             ? "Bodyweight"
             : "\(exercise.targetWeight.formatted(.number.precision(.fractionLength(0...1)))) kg"
+        let goal = exercise.trackingMode == .duration
+            ? exercise.targetDurationSeconds.minuteSecondText
+            : "\(exercise.targetReps) reps"
         let rest = exercise.restSeconds == 0 ? "No rest" : "Rest \(exercise.restSeconds.minuteSecondText)"
-        return "\(load) · \(exercise.targetReps) reps × \(exercise.setCount) sets · \(rest)"
+        return "\(load) · \(goal) × \(exercise.setCount) sets · \(rest)"
     }
 
     private var accessibilitySummary: String {
         let load = exercise.exerciseKind == .bodyweight
             ? "Bodyweight"
             : "\(exercise.targetWeight.formatted()) kilograms"
+        let goal = exercise.trackingMode == .duration
+            ? "\(exercise.targetDurationSeconds) seconds"
+            : "\(exercise.targetReps) reps"
         let rest = exercise.restSeconds == 0 ? "No rest" : "\(exercise.restSeconds) seconds rest"
-        return "Position \(order). \(load), \(exercise.targetReps) reps for \(exercise.setCount) sets, \(rest)."
+        return "Position \(order). \(load), \(goal) for \(exercise.setCount) sets, \(rest)."
     }
 }
 
@@ -658,12 +665,21 @@ private struct EditableExerciseCard: View {
             }
             .pickerStyle(.segmented)
 
+            Picker("Track each set by", selection: $exercise.trackingMode) {
+                Label("Reps", systemImage: "repeat")
+                    .tag(ExerciseTrackingMode.reps)
+                Label("Time", systemImage: "timer")
+                    .tag(ExerciseTrackingMode.duration)
+            }
+            .pickerStyle(.segmented)
+            .accessibilityHint("Choose repetitions or a timed hold for each set")
+
             if dynamicTypeSize.isAccessibilitySize {
                 if exercise.exerciseKind == .weighted {
                     weightField
                     Divider().overlay(DamSetDesign.steelMuted)
                 }
-                repsField
+                goalField
                 Divider().overlay(DamSetDesign.steelMuted)
                 setsField
                 Divider().overlay(DamSetDesign.steelMuted)
@@ -679,7 +695,7 @@ private struct EditableExerciseCard: View {
                     if exercise.exerciseKind == .weighted {
                         weightField
                     }
-                    repsField
+                    goalField
                     setsField
                     restField
                 }
@@ -706,6 +722,29 @@ private struct EditableExerciseCard: View {
             decrement: { exercise.targetReps = max(0, exercise.targetReps - 1) },
             increment: { exercise.targetReps = min(999, exercise.targetReps + 1) },
             directEntry: updateReps
+        )
+    }
+
+    @ViewBuilder
+    private var goalField: some View {
+        if exercise.trackingMode == .duration {
+            durationField
+        } else {
+            repsField
+        }
+    }
+
+    private var durationField: some View {
+        StepperField(
+            title: "Duration / set",
+            value: exercise.targetDurationSeconds.minuteSecondText,
+            decrement: {
+                exercise.targetDurationSeconds = max(0, exercise.targetDurationSeconds - 5)
+            },
+            increment: {
+                exercise.targetDurationSeconds = min(86_400, exercise.targetDurationSeconds + 5)
+            },
+            directEntry: updateDuration
         )
     }
 
@@ -752,6 +791,11 @@ private struct EditableExerciseCard: View {
     private func updateReps(_ rawValue: String) {
         guard let value = Int(rawValue.trimmingCharacters(in: .whitespacesAndNewlines)) else { return }
         exercise.targetReps = min(999, max(0, value))
+    }
+
+    private func updateDuration(_ rawValue: String) {
+        guard let seconds = parsedRestSeconds(rawValue) else { return }
+        exercise.targetDurationSeconds = seconds
     }
 
     private func updateSets(_ rawValue: String) {
@@ -818,7 +862,8 @@ private struct ExerciseEditorSheet: View {
 
     private var canSave: Bool {
         !draft.exerciseName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-        draft.setCount > 0
+        draft.setCount > 0 &&
+        (draft.trackingMode == .reps || draft.targetDurationSeconds > 0)
     }
 }
 
@@ -867,7 +912,11 @@ private struct StepperField: View {
                 .disabled(!isValidDraft)
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text(title == "Rest after set" ? "Enter seconds or mm:ss." : "Enter a number.")
+            Text(
+                title == "Rest after set" || title == "Duration / set"
+                    ? "Enter seconds or mm:ss."
+                    : "Enter a number."
+            )
         }
     }
 
@@ -887,7 +936,7 @@ private struct StepperField: View {
             return Int(trimmed).map { $0 >= 0 } ?? false
         case "Sets":
             return Int(trimmed).map { $0 >= 1 } ?? false
-        case "Rest after set":
+        case "Rest after set", "Duration / set":
             let parts = trimmed.split(separator: ":", omittingEmptySubsequences: false)
             if parts.count == 2,
                let minutes = Int(parts[0]),
@@ -954,6 +1003,21 @@ private struct EditableExercisePlan: Identifiable, Equatable {
         set { plan.targetReps = min(999, max(0, newValue)) }
     }
 
+    var trackingMode: ExerciseTrackingMode {
+        get { plan.trackingMode }
+        set {
+            plan.trackingMode = newValue
+            if newValue == .duration, plan.targetDurationSeconds == 0 {
+                plan.targetDurationSeconds = 60
+            }
+        }
+    }
+
+    var targetDurationSeconds: Int {
+        get { plan.targetDurationSeconds }
+        set { plan.targetDurationSeconds = min(86_400, max(0, newValue)) }
+    }
+
     var setCount: Int {
         get { plan.setCount }
         set { plan.setCount = min(99, max(1, newValue)) }
@@ -969,6 +1033,8 @@ private struct EditableExercisePlan: Identifiable, Equatable {
         exerciseKind: ExerciseKind = .weighted,
         targetWeight: Double = 20,
         targetReps: Int = 8,
+        trackingMode: ExerciseTrackingMode = .reps,
+        targetDurationSeconds: Int = 60,
         setCount: Int = 3,
         restSeconds: Int = 90,
         manuallyAdded: Bool = true
@@ -979,6 +1045,8 @@ private struct EditableExercisePlan: Identifiable, Equatable {
             exerciseKind: exerciseKind,
             targetWeight: normalizedWeight,
             targetReps: targetReps,
+            trackingMode: trackingMode,
+            targetDurationSeconds: targetDurationSeconds,
             setCount: setCount,
             restDurationSeconds: restSeconds,
             manuallyAdded: manuallyAdded
@@ -997,6 +1065,8 @@ private struct EditableExercisePlan: Identifiable, Equatable {
             exerciseKind: exerciseKind,
             targetWeight: targetWeight,
             targetReps: targetReps,
+            trackingMode: trackingMode,
+            targetDurationSeconds: targetDurationSeconds,
             setCount: setCount,
             restSeconds: restSeconds,
             manuallyAdded: true

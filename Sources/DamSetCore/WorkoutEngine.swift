@@ -5,6 +5,7 @@ public enum WorkoutEngineError: Error, Equatable, Sendable {
     case noActiveSet
     case sessionAlreadyCompleted
     case invalidTransition
+    case invalidProgressMetric
 }
 
 public enum RestCueDecision: Equatable, Sendable {
@@ -35,7 +36,10 @@ public struct WorkoutEngine: Sendable {
 
     public func adjustActualReps(session: inout WorkoutRoutineSession, delta: Int) throws {
         try validateEditableProgress(session)
-        let updatedReps = max(0, session.lockScreenState.actualReps + delta)
+        guard session.lockScreenState.trackingMode == .reps else {
+            throw WorkoutEngineError.invalidProgressMetric
+        }
+        let updatedReps = clampedNonnegativeSum(session.lockScreenState.actualReps, delta)
         if session.sessionStatus == .resting,
            let lastCompletedIndex = session.completedSets.indices.last {
             session.completedSets[lastCompletedIndex].actualReps = updatedReps
@@ -43,6 +47,31 @@ public struct WorkoutEngine: Sendable {
             throw WorkoutEngineError.noActiveSet
         }
         session.lockScreenState.actualReps = updatedReps
+    }
+
+    /// Adjusts the recorded hold/work duration for a duration-based exercise.
+    /// During rest this corrects the set that was just completed, mirroring the
+    /// established repetitions correction behavior.
+    public func adjustActualDuration(
+        session: inout WorkoutRoutineSession,
+        deltaSeconds: Int
+    ) throws {
+        try validateEditableProgress(session)
+        guard session.lockScreenState.trackingMode == .duration else {
+            throw WorkoutEngineError.invalidProgressMetric
+        }
+
+        let updatedDuration = clampedNonnegativeSum(
+            session.lockScreenState.actualDurationSeconds,
+            deltaSeconds
+        )
+        if session.sessionStatus == .resting,
+           let lastCompletedIndex = session.completedSets.indices.last {
+            session.completedSets[lastCompletedIndex].actualDurationSeconds = updatedDuration
+        } else if session.sessionStatus == .resting {
+            throw WorkoutEngineError.noActiveSet
+        }
+        session.lockScreenState.actualDurationSeconds = updatedDuration
     }
 
     public func adjustActualWeight(session: inout WorkoutRoutineSession, delta: Double) throws {
@@ -84,7 +113,9 @@ public struct WorkoutEngine: Sendable {
             exerciseKind: planned.exerciseKind,
             actualWeight: session.lockScreenState.actualWeight,
             actualReps: session.lockScreenState.actualReps,
-            completedAt: now
+            completedAt: now,
+            trackingMode: planned.trackingMode,
+            actualDurationSeconds: session.lockScreenState.actualDurationSeconds
         )
         session.completedSets.append(completed)
 
@@ -96,7 +127,8 @@ public struct WorkoutEngine: Sendable {
                 setIndex: session.currentSetIndex,
                 totalSets: session.plannedSets.count,
                 actualReps: completed.actualReps,
-                actualWeight: completed.actualWeight
+                actualWeight: completed.actualWeight,
+                actualDurationSeconds: completed.actualDurationSeconds
             )
             return
         }
@@ -108,7 +140,8 @@ public struct WorkoutEngine: Sendable {
             totalSets: session.plannedSets.count,
             actualReps: completed.actualReps,
             actualWeight: completed.actualWeight,
-            resumeAt: now.addingTimeInterval(TimeInterval(planned.restDurationSeconds))
+            resumeAt: now.addingTimeInterval(TimeInterval(planned.restDurationSeconds)),
+            actualDurationSeconds: completed.actualDurationSeconds
         )
         if planned.restDurationSeconds == 0 {
             startNextSetAfterRest(session: &session)
@@ -233,6 +266,7 @@ public struct WorkoutEngine: Sendable {
         )
         session.lockScreenState.actualReps = completed.actualReps
         session.lockScreenState.actualWeight = completed.actualWeight
+        session.lockScreenState.actualDurationSeconds = completed.actualDurationSeconds
     }
 
     public func addSessionScopedSet(
@@ -241,6 +275,8 @@ public struct WorkoutEngine: Sendable {
         exerciseKind: ExerciseKind = .weighted,
         targetWeight: Double,
         targetReps: Int,
+        trackingMode: ExerciseTrackingMode = .reps,
+        targetDurationSeconds: Int = 0,
         restDurationSeconds: Int
     ) {
         let planned = PlannedSet(
@@ -249,6 +285,8 @@ public struct WorkoutEngine: Sendable {
             exerciseKind: exerciseKind,
             targetWeight: targetWeight,
             targetReps: targetReps,
+            trackingMode: trackingMode,
+            targetDurationSeconds: targetDurationSeconds,
             restDurationSeconds: restDurationSeconds,
             manuallyAdded: true
         )
@@ -324,5 +362,13 @@ public struct WorkoutEngine: Sendable {
         let interval = max(0, resumeAt.timeIntervalSince(now))
         guard interval < Double(Int.max) else { return Int.max }
         return Int(ceil(interval))
+    }
+
+    private func clampedNonnegativeSum(_ value: Int, _ delta: Int) -> Int {
+        let (sum, overflowed) = value.addingReportingOverflow(delta)
+        if overflowed {
+            return delta > 0 ? Int.max : 0
+        }
+        return max(0, sum)
     }
 }

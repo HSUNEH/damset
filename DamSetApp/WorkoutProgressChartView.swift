@@ -18,18 +18,18 @@ struct WorkoutProgressChartView: View {
 
         let names = Self.exerciseNames(in: selectedSummary)
         let firstName = names.first ?? ""
-        let firstIsWeighted = selectedSummary.completedSets.contains {
-            $0.exerciseName == firstName && $0.exerciseKind == .weighted
-        }
         _selectedExerciseName = State(initialValue: firstName)
-        _metric = State(initialValue: firstIsWeighted ? .weight : .reps)
+        _metric = State(initialValue: Self.preferredMetric(
+            forExerciseNamed: firstName,
+            in: selectedSummary
+        ))
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             exerciseMenu
 
-            if supportsWeightMetric {
+            if availableMetrics.count > 1 {
                 metricPicker
             }
 
@@ -48,17 +48,13 @@ struct WorkoutProgressChartView: View {
         .dynamicTypeSize(...DynamicTypeSize.xLarge)
         .gymPanel(accent: DamSetDesign.accent.opacity(0.72), cut: 14, padding: 16)
         .onChange(of: selectedExerciseName) { _, _ in
-            if !supportsWeightMetric {
-                metric = .reps
-            }
+            selectPreferredMetric()
         }
         .onChange(of: exerciseNames) { _, updatedNames in
             guard !updatedNames.contains(selectedExerciseName),
                   let firstName = updatedNames.first else { return }
             selectedExerciseName = firstName
-            metric = selectedSummary.completedSets.contains {
-                $0.exerciseName == firstName && $0.exerciseKind == .weighted
-            } ? .weight : .reps
+            metric = Self.preferredMetric(forExerciseNamed: firstName, in: selectedSummary)
         }
     }
 
@@ -108,8 +104,9 @@ struct WorkoutProgressChartView: View {
 
     private var metricPicker: some View {
         Picker("Progress metric", selection: $metric) {
-            Text("Best weight").tag(WorkoutProgressMetric.weight)
-            Text("Best reps").tag(WorkoutProgressMetric.reps)
+            ForEach(availableMetrics, id: \.self) { availableMetric in
+                Text(availableMetric.pickerTitle).tag(availableMetric)
+            }
         }
         .pickerStyle(.segmented)
     }
@@ -186,9 +183,12 @@ struct WorkoutProgressChartView: View {
             }
         }
         .chartYAxis {
-            AxisMarks(position: .leading, values: .automatic(desiredCount: 4)) {
+            AxisMarks(position: .leading, values: .automatic(desiredCount: 4)) { value in
                 AxisGridLine().foregroundStyle(DamSetDesign.steelMuted.opacity(0.38))
-                AxisValueLabel().foregroundStyle(DamSetDesign.steel)
+                AxisValueLabel {
+                    Text(axisValueText(value.as(Double.self) ?? 0))
+                }
+                .foregroundStyle(DamSetDesign.steel)
             }
         }
         .chartPlotStyle { plot in
@@ -237,10 +237,9 @@ struct WorkoutProgressChartView: View {
         analysis.progress(forExerciseNamed: selectedExerciseName)
     }
 
-    private var supportsWeightMetric: Bool {
-        selectedSummary.completedSets.contains {
-            $0.exerciseName == selectedExerciseName && $0.exerciseKind == .weighted
-        } && !(series?.weightPoints.isEmpty ?? true)
+    private var availableMetrics: [WorkoutProgressMetric] {
+        guard let series else { return [] }
+        return WorkoutProgressMetric.allCases.filter { !series.points(for: $0).isEmpty }
     }
 
     private var points: [WorkoutProgressPoint] {
@@ -256,7 +255,15 @@ struct WorkoutProgressChartView: View {
               let maximum = points.map(\.value).max() else {
             return 0...1
         }
-        let minimumPadding = metric == .weight ? 2.5 : 1
+        let minimumPadding: Double
+        switch metric {
+        case .weight:
+            minimumPadding = 2.5
+        case .reps:
+            minimumPadding = 1
+        case .duration:
+            minimumPadding = 5
+        }
         let padding = max((maximum - minimum) * 0.18, minimumPadding)
         return max(0, minimum - padding)...(maximum + padding)
     }
@@ -272,6 +279,19 @@ struct WorkoutProgressChartView: View {
             return "\(value.formatted(.number.precision(.fractionLength(0...1)))) kg"
         case .reps:
             return "\(Int(value.rounded())) reps"
+        case .duration:
+            return Int(value.rounded()).minuteSecondText
+        }
+    }
+
+    private func axisValueText(_ value: Double) -> String {
+        switch metric {
+        case .weight:
+            return value.formatted(.number.precision(.fractionLength(0...1)))
+        case .reps:
+            return "\(Int(value.rounded()))"
+        case .duration:
+            return Int(value.rounded()).minuteSecondText
         }
     }
 
@@ -296,6 +316,32 @@ struct WorkoutProgressChartView: View {
         }
         return names
     }
+
+    private static func preferredMetric(
+        forExerciseNamed exerciseName: String,
+        in summary: WorkoutSummary
+    ) -> WorkoutProgressMetric {
+        let matchingSets = summary.completedSets.filter { $0.exerciseName == exerciseName }
+        if matchingSets.contains(where: { $0.trackingMode == .duration }) {
+            return .duration
+        }
+        if matchingSets.contains(where: { $0.exerciseKind == .weighted }) {
+            return .weight
+        }
+        return .reps
+    }
+
+    private func selectPreferredMetric() {
+        let preferred = Self.preferredMetric(
+            forExerciseNamed: selectedExerciseName,
+            in: selectedSummary
+        )
+        if availableMetrics.contains(preferred) {
+            metric = preferred
+        } else if let firstAvailableMetric = availableMetrics.first {
+            metric = firstAvailableMetric
+        }
+    }
 }
 
 private extension WorkoutProgressMetric {
@@ -303,6 +349,15 @@ private extension WorkoutProgressMetric {
         switch self {
         case .weight: "Weight (kg)"
         case .reps: "Reps"
+        case .duration: "Time (mm:ss)"
+        }
+    }
+
+    var pickerTitle: String {
+        switch self {
+        case .weight: "Best weight"
+        case .reps: "Best reps"
+        case .duration: "Best time"
         }
     }
 
@@ -310,6 +365,7 @@ private extension WorkoutProgressMetric {
         switch self {
         case .weight: "best weight"
         case .reps: "best repetitions"
+        case .duration: "best duration"
         }
     }
 }

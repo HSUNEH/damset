@@ -441,6 +441,50 @@ final class WorkoutEngineTests: XCTestCase {
         XCTAssertEqual(migrated.completedSets.last?.actualWeight, 62.5)
     }
 
+    func testActiveSessionStoreMigratesMissingDurationFieldsAsReps() throws {
+        let routine = try XCTUnwrap(RoutineCatalog.defaultRoutines.first)
+        let engine = WorkoutEngine()
+        var session = try engine.startSession(routine: routine, sessionId: "legacy-duration")
+        try engine.completeCurrentSet(session: &session, now: Date(timeIntervalSince1970: 5))
+
+        let fileURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("damset-tests-legacy-duration-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: fileURL) }
+
+        let store = ActiveSessionStore(fileURL: fileURL)
+        try store.save(session)
+
+        let data = try Data(contentsOf: fileURL)
+        var json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        var planned = try XCTUnwrap(json["plannedSets"] as? [[String: Any]])
+        for index in planned.indices {
+            planned[index].removeValue(forKey: "trackingMode")
+            planned[index].removeValue(forKey: "targetDurationSeconds")
+        }
+        json["plannedSets"] = planned
+
+        var completed = try XCTUnwrap(json["completedSets"] as? [[String: Any]])
+        for index in completed.indices {
+            completed[index].removeValue(forKey: "trackingMode")
+            completed[index].removeValue(forKey: "actualDurationSeconds")
+        }
+        json["completedSets"] = completed
+
+        var lockState = try XCTUnwrap(json["lockScreenState"] as? [String: Any])
+        lockState.removeValue(forKey: "trackingMode")
+        lockState.removeValue(forKey: "targetDurationSeconds")
+        lockState.removeValue(forKey: "actualDurationSeconds")
+        json["lockScreenState"] = lockState
+        try JSONSerialization.data(withJSONObject: json).write(to: fileURL, options: .atomic)
+
+        let migrated = try XCTUnwrap(try ActiveSessionStore(fileURL: fileURL).load())
+        XCTAssertTrue(migrated.plannedSets.allSatisfy { $0.trackingMode == .reps })
+        XCTAssertTrue(migrated.completedSets.allSatisfy { $0.trackingMode == .reps })
+        XCTAssertEqual(migrated.lockScreenState.trackingMode, .reps)
+        XCTAssertEqual(migrated.lockScreenState.targetDurationSeconds, 0)
+        XCTAssertEqual(migrated.lockScreenState.actualDurationSeconds, 0)
+    }
+
     func testCompletedSessionRejectsProgressCorrections() throws {
         let routine = RoutineTemplate(
             routineId: "one-set",
@@ -553,6 +597,133 @@ final class WorkoutEngineTests: XCTestCase {
         } else {
             XCTFail("Expected fallback when playback is interrupted")
         }
+    }
+
+    func testDurationExerciseSeedsAndRecordsCanonicalDuration() throws {
+        let routine = RoutineTemplate(
+            routineId: "plank",
+            routineName: "Core",
+            plannedSets: [
+                PlannedSet(
+                    setId: "plank-1",
+                    exerciseName: "Plank",
+                    exerciseKind: .bodyweight,
+                    targetWeight: 0,
+                    targetReps: 0,
+                    trackingMode: .duration,
+                    targetDurationSeconds: 75,
+                    restDurationSeconds: 0
+                )
+            ]
+        )
+        let engine = WorkoutEngine()
+        var session = try engine.startSession(routine: routine)
+
+        XCTAssertEqual(session.lockScreenState.trackingMode, .duration)
+        XCTAssertEqual(session.lockScreenState.targetDurationSeconds, 75)
+        XCTAssertEqual(session.lockScreenState.actualDurationSeconds, 75)
+        XCTAssertEqual(session.lockScreenState.actualReps, 0)
+        XCTAssertFalse(session.lockScreenState.canIncrementReps)
+        XCTAssertTrue(session.lockScreenState.canIncrementDuration)
+
+        try engine.adjustActualDuration(session: &session, deltaSeconds: -15)
+        try engine.completeCurrentSet(session: &session, now: Date(timeIntervalSince1970: 100))
+
+        let completed = try XCTUnwrap(session.completedSets.first)
+        XCTAssertEqual(completed.trackingMode, .duration)
+        XCTAssertEqual(completed.actualDurationSeconds, 60)
+        XCTAssertEqual(completed.actualReps, 0)
+        XCTAssertEqual(session.lockScreenState.phase, .completed)
+        XCTAssertEqual(session.lockScreenState.actualDurationSeconds, 60)
+        XCTAssertEqual(engine.summarize(session: session).totalVolume, 0)
+    }
+
+    func testDurationCorrectionDuringRestAndNextSetKeepMode() throws {
+        let routine = RoutineTemplate(
+            routineId: "plank-rest",
+            routineName: "Core",
+            plannedSets: [
+                PlannedSet(
+                    setId: "plank-1",
+                    exerciseName: "Plank",
+                    exerciseKind: .bodyweight,
+                    targetWeight: 0,
+                    targetReps: 0,
+                    trackingMode: .duration,
+                    targetDurationSeconds: 45,
+                    restDurationSeconds: 30
+                ),
+                PlannedSet(
+                    setId: "plank-2",
+                    exerciseName: "Plank",
+                    exerciseKind: .bodyweight,
+                    targetWeight: 0,
+                    targetReps: 0,
+                    trackingMode: .duration,
+                    targetDurationSeconds: 60,
+                    restDurationSeconds: 30
+                )
+            ]
+        )
+        let engine = WorkoutEngine()
+        let completedAt = Date(timeIntervalSince1970: 100)
+        var session = try engine.startSession(routine: routine)
+
+        try engine.completeCurrentSet(session: &session, now: completedAt)
+        try engine.adjustActualDuration(session: &session, deltaSeconds: 5)
+        XCTAssertEqual(session.completedSets.last?.actualDurationSeconds, 50)
+        XCTAssertEqual(session.lockScreenState.actualDurationSeconds, 50)
+
+        let resumeAt = try XCTUnwrap(session.lockScreenState.resumeAt)
+        engine.updateRest(session: &session, now: resumeAt)
+        XCTAssertEqual(session.lockScreenState.trackingMode, .duration)
+        XCTAssertEqual(session.lockScreenState.targetDurationSeconds, 60)
+        XCTAssertEqual(session.lockScreenState.actualDurationSeconds, 60)
+    }
+
+    func testProgressAdjustmentsRejectTheInactiveMetric() throws {
+        let durationRoutine = RoutineTemplate(
+            routineId: "duration-only",
+            routineName: "Duration",
+            plannedSets: [
+                PlannedSet(
+                    setId: "hold",
+                    exerciseName: "Wall Sit",
+                    exerciseKind: .bodyweight,
+                    targetWeight: 0,
+                    targetReps: 0,
+                    trackingMode: .duration,
+                    targetDurationSeconds: 30,
+                    restDurationSeconds: 0
+                )
+            ]
+        )
+        let repsRoutine = RoutineTemplate(
+            routineId: "reps-only",
+            routineName: "Reps",
+            plannedSets: [
+                PlannedSet(
+                    setId: "push-up",
+                    exerciseName: "Push-Up",
+                    exerciseKind: .bodyweight,
+                    targetWeight: 0,
+                    targetReps: 10,
+                    restDurationSeconds: 0
+                )
+            ]
+        )
+        let engine = WorkoutEngine()
+        var durationSession = try engine.startSession(routine: durationRoutine)
+        var repsSession = try engine.startSession(routine: repsRoutine)
+
+        XCTAssertThrowsError(try engine.adjustActualReps(session: &durationSession, delta: 1)) {
+            XCTAssertEqual($0 as? WorkoutEngineError, .invalidProgressMetric)
+        }
+        XCTAssertThrowsError(try engine.adjustActualDuration(session: &repsSession, deltaSeconds: 1)) {
+            XCTAssertEqual($0 as? WorkoutEngineError, .invalidProgressMetric)
+        }
+        XCTAssertEqual(durationSession.lockScreenState.actualDurationSeconds, 30)
+        XCTAssertEqual(repsSession.lockScreenState.actualReps, 10)
     }
 
     private func makeSummary(sessionId: String, endedAt: TimeInterval) throws -> WorkoutSummary {

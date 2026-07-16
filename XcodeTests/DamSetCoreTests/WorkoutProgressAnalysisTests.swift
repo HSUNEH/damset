@@ -173,6 +173,68 @@ final class WorkoutProgressAnalysisTests: XCTestCase {
         XCTAssertEqual(legacySelection.workouts.map(\.sessionId), ["legacy-different", "modern-pull"])
     }
 
+    func testDurationProgressUsesBestRecordedTimeAndExcludesRepsMetric() throws {
+        let older = makeSummary(
+            sessionId: "plank-old",
+            routineId: "core",
+            routineName: "Core",
+            endedAt: 100,
+            sets: [
+                CompletedSet(
+                    setId: "plank-old-1",
+                    exerciseName: "Plank",
+                    exerciseKind: .bodyweight,
+                    actualWeight: 0,
+                    actualReps: 0,
+                    completedAt: Date(timeIntervalSince1970: 100),
+                    trackingMode: .duration,
+                    actualDurationSeconds: 45
+                ),
+                CompletedSet(
+                    setId: "plank-old-2",
+                    exerciseName: "Plank",
+                    exerciseKind: .bodyweight,
+                    actualWeight: 0,
+                    actualReps: 0,
+                    completedAt: Date(timeIntervalSince1970: 100),
+                    trackingMode: .duration,
+                    actualDurationSeconds: 40
+                )
+            ]
+        )
+        let selected = makeSummary(
+            sessionId: "plank-new",
+            routineId: "core",
+            routineName: "Core",
+            endedAt: 200,
+            sets: [
+                CompletedSet(
+                    setId: "plank-new-1",
+                    exerciseName: "Plank",
+                    exerciseKind: .bodyweight,
+                    actualWeight: 0,
+                    actualReps: 0,
+                    completedAt: Date(timeIntervalSince1970: 200),
+                    trackingMode: .duration,
+                    actualDurationSeconds: 60
+                )
+            ]
+        )
+
+        let analysis = WorkoutProgressAnalysis(
+            selectedSummary: selected,
+            allSummaries: [older, selected]
+        )
+        let plank = try XCTUnwrap(analysis.progress(forExerciseNamed: "Plank"))
+
+        XCTAssertEqual(plank.durationPoints.map(\.value), [45, 60])
+        XCTAssertNil(plank.durationPoints[0].deltaFromPrevious)
+        XCTAssertEqual(plank.durationPoints[1].deltaFromPrevious, 15)
+        XCTAssertEqual(plank.points(for: .duration), plank.durationPoints)
+        XCTAssertTrue(plank.repsPoints.isEmpty)
+        XCTAssertTrue(plank.weightPoints.isEmpty)
+    }
+
     private func makeSummary(
         sessionId: String,
         routineId: String?,

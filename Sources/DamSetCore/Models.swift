@@ -99,6 +99,17 @@ public enum ExerciseKind: String, Codable, CaseIterable, Equatable, Sendable {
     case weighted
 }
 
+/// Defines how a set's primary result is prescribed and recorded.
+///
+/// Weight-bearing is deliberately modeled separately by `ExerciseKind`: a
+/// weighted carry can be tracked by duration, while a bodyweight push-up can
+/// still be tracked by repetitions. Older saved workouts predate this field,
+/// so they decode as `.reps`.
+public enum ExerciseTrackingMode: String, Codable, CaseIterable, Equatable, Sendable {
+    case reps
+    case duration
+}
+
 public struct PlannedSet: Identifiable, Codable, Equatable, Sendable {
     public var setId: String
     public var exerciseName: String
@@ -112,7 +123,12 @@ public struct PlannedSet: Identifiable, Codable, Equatable, Sendable {
         get { storedTargetWeight }
         set { storedTargetWeight = Self.normalizedWeight(newValue, for: exerciseKind) }
     }
+    public var trackingMode: ExerciseTrackingMode
     public var targetReps: Int
+    /// The target hold/work duration for `.duration` exercises, in seconds.
+    /// It is retained for all modes so changing a routine's tracking mode does
+    /// not silently discard an entered target.
+    public var targetDurationSeconds: Int
     public var restDurationSeconds: Int
     public var manuallyAdded: Bool
 
@@ -124,6 +140,8 @@ public struct PlannedSet: Identifiable, Codable, Equatable, Sendable {
         exerciseKind: ExerciseKind = .weighted,
         targetWeight: Double,
         targetReps: Int,
+        trackingMode: ExerciseTrackingMode = .reps,
+        targetDurationSeconds: Int = 0,
         restDurationSeconds: Int,
         manuallyAdded: Bool = false
     ) {
@@ -131,7 +149,9 @@ public struct PlannedSet: Identifiable, Codable, Equatable, Sendable {
         self.exerciseName = exerciseName
         self.exerciseKind = exerciseKind
         self.storedTargetWeight = Self.normalizedWeight(targetWeight, for: exerciseKind)
+        self.trackingMode = trackingMode
         self.targetReps = max(0, targetReps)
+        self.targetDurationSeconds = max(0, targetDurationSeconds)
         self.restDurationSeconds = max(0, restDurationSeconds)
         self.manuallyAdded = manuallyAdded
     }
@@ -142,6 +162,8 @@ public struct PlannedSet: Identifiable, Codable, Equatable, Sendable {
         case exerciseKind
         case targetWeight
         case targetReps
+        case trackingMode
+        case targetDurationSeconds
         case restDurationSeconds
         case manuallyAdded
     }
@@ -156,6 +178,8 @@ public struct PlannedSet: Identifiable, Codable, Equatable, Sendable {
             exerciseKind: try container.decodeIfPresent(ExerciseKind.self, forKey: .exerciseKind) ?? .weighted,
             targetWeight: try container.decode(Double.self, forKey: .targetWeight),
             targetReps: try container.decode(Int.self, forKey: .targetReps),
+            trackingMode: try container.decodeIfPresent(ExerciseTrackingMode.self, forKey: .trackingMode) ?? .reps,
+            targetDurationSeconds: try container.decodeIfPresent(Int.self, forKey: .targetDurationSeconds) ?? 0,
             restDurationSeconds: try container.decode(Int.self, forKey: .restDurationSeconds),
             manuallyAdded: try container.decodeIfPresent(Bool.self, forKey: .manuallyAdded) ?? false
         )
@@ -168,6 +192,8 @@ public struct PlannedSet: Identifiable, Codable, Equatable, Sendable {
         try container.encode(exerciseKind, forKey: .exerciseKind)
         try container.encode(targetWeight, forKey: .targetWeight)
         try container.encode(targetReps, forKey: .targetReps)
+        try container.encode(trackingMode, forKey: .trackingMode)
+        try container.encode(targetDurationSeconds, forKey: .targetDurationSeconds)
         try container.encode(restDurationSeconds, forKey: .restDurationSeconds)
         try container.encode(manuallyAdded, forKey: .manuallyAdded)
     }
@@ -194,8 +220,13 @@ public struct RoutineExercisePlan: Identifiable, Equatable, Sendable {
         get { storedTargetWeight }
         set { storedTargetWeight = Self.normalizedWeight(newValue, for: exerciseKind) }
     }
+    public var trackingMode: ExerciseTrackingMode
     public var targetReps: Int {
         didSet { targetReps = max(0, targetReps) }
+    }
+    /// The target hold/work duration for `.duration` exercises, in seconds.
+    public var targetDurationSeconds: Int {
+        didSet { targetDurationSeconds = max(0, targetDurationSeconds) }
     }
     public var setCount: Int {
         didSet { setCount = max(1, setCount) }
@@ -215,6 +246,8 @@ public struct RoutineExercisePlan: Identifiable, Equatable, Sendable {
         exerciseKind: ExerciseKind = .weighted,
         targetWeight: Double,
         targetReps: Int,
+        trackingMode: ExerciseTrackingMode = .reps,
+        targetDurationSeconds: Int = 0,
         setCount: Int = 1,
         restDurationSeconds: Int,
         manuallyAdded: Bool = false
@@ -223,7 +256,9 @@ public struct RoutineExercisePlan: Identifiable, Equatable, Sendable {
         self.exerciseName = exerciseName
         self.exerciseKind = exerciseKind
         self.storedTargetWeight = Self.normalizedWeight(targetWeight, for: exerciseKind)
+        self.trackingMode = trackingMode
         self.targetReps = max(0, targetReps)
+        self.targetDurationSeconds = max(0, targetDurationSeconds)
         self.setCount = max(1, setCount)
         self.restDurationSeconds = max(0, restDurationSeconds)
         self.manuallyAdded = manuallyAdded
@@ -261,6 +296,8 @@ public struct RoutineExercisePlan: Identifiable, Equatable, Sendable {
                 exerciseKind: exerciseKind,
                 targetWeight: targetWeight,
                 targetReps: targetReps,
+                trackingMode: trackingMode,
+                targetDurationSeconds: targetDurationSeconds,
                 restDurationSeconds: restDurationSeconds,
                 manuallyAdded: manuallyAdded
             )
@@ -272,7 +309,9 @@ public struct RoutineExercisePlan: Identifiable, Equatable, Sendable {
         self.exerciseName = plannedSet.exerciseName
         self.exerciseKind = plannedSet.exerciseKind
         self.storedTargetWeight = plannedSet.targetWeight
+        self.trackingMode = plannedSet.trackingMode
         self.targetReps = plannedSet.targetReps
+        self.targetDurationSeconds = plannedSet.targetDurationSeconds
         self.setCount = 1
         self.restDurationSeconds = plannedSet.restDurationSeconds
         self.manuallyAdded = plannedSet.manuallyAdded
@@ -283,7 +322,9 @@ public struct RoutineExercisePlan: Identifiable, Equatable, Sendable {
         exerciseName == plannedSet.exerciseName
             && exerciseKind == plannedSet.exerciseKind
             && targetWeight == plannedSet.targetWeight
+            && trackingMode == plannedSet.trackingMode
             && targetReps == plannedSet.targetReps
+            && targetDurationSeconds == plannedSet.targetDurationSeconds
             && restDurationSeconds == plannedSet.restDurationSeconds
             && manuallyAdded == plannedSet.manuallyAdded
     }
@@ -340,7 +381,10 @@ public struct CompletedSet: Identifiable, Codable, Equatable, Sendable {
         get { storedActualWeight }
         set { storedActualWeight = Self.normalizedWeight(newValue, for: exerciseKind) }
     }
+    public var trackingMode: ExerciseTrackingMode
     public var actualReps: Int
+    /// The recorded hold/work duration for `.duration` exercises, in seconds.
+    public var actualDurationSeconds: Int
     public var completedAt: Date
 
     public var id: String { setId }
@@ -351,18 +395,23 @@ public struct CompletedSet: Identifiable, Codable, Equatable, Sendable {
         exerciseKind: ExerciseKind = .weighted,
         actualWeight: Double,
         actualReps: Int,
-        completedAt: Date
+        completedAt: Date,
+        trackingMode: ExerciseTrackingMode = .reps,
+        actualDurationSeconds: Int = 0
     ) {
         self.setId = setId
         self.exerciseName = exerciseName
         self.exerciseKind = exerciseKind
         self.storedActualWeight = Self.normalizedWeight(actualWeight, for: exerciseKind)
+        self.trackingMode = trackingMode
         self.actualReps = max(0, actualReps)
+        self.actualDurationSeconds = max(0, actualDurationSeconds)
         self.completedAt = completedAt
     }
 
     private enum CodingKeys: String, CodingKey {
-        case setId, exerciseName, exerciseKind, actualWeight, actualReps, completedAt
+        case setId, exerciseName, exerciseKind, actualWeight, trackingMode
+        case actualReps, actualDurationSeconds, completedAt
     }
 
     public init(from decoder: Decoder) throws {
@@ -373,7 +422,9 @@ public struct CompletedSet: Identifiable, Codable, Equatable, Sendable {
             exerciseKind: try container.decodeIfPresent(ExerciseKind.self, forKey: .exerciseKind) ?? .weighted,
             actualWeight: try container.decode(Double.self, forKey: .actualWeight),
             actualReps: try container.decode(Int.self, forKey: .actualReps),
-            completedAt: try container.decode(Date.self, forKey: .completedAt)
+            completedAt: try container.decode(Date.self, forKey: .completedAt),
+            trackingMode: try container.decodeIfPresent(ExerciseTrackingMode.self, forKey: .trackingMode) ?? .reps,
+            actualDurationSeconds: try container.decodeIfPresent(Int.self, forKey: .actualDurationSeconds) ?? 0
         )
     }
 
@@ -383,7 +434,9 @@ public struct CompletedSet: Identifiable, Codable, Equatable, Sendable {
         try container.encode(exerciseName, forKey: .exerciseName)
         try container.encode(exerciseKind, forKey: .exerciseKind)
         try container.encode(actualWeight, forKey: .actualWeight)
+        try container.encode(trackingMode, forKey: .trackingMode)
         try container.encode(actualReps, forKey: .actualReps)
+        try container.encode(actualDurationSeconds, forKey: .actualDurationSeconds)
         try container.encode(completedAt, forKey: .completedAt)
     }
 
@@ -417,8 +470,14 @@ public struct LockScreenState: Codable, Equatable, Sendable {
     }
     public var currentSetIndex: Int
     public var totalPlannedSets: Int
+    public var trackingMode: ExerciseTrackingMode
     public var targetReps: Int
     public var actualReps: Int
+    /// The duration target and recorded value for time-based exercises.
+    /// Repetition-based sessions retain zero here, which keeps old session
+    /// snapshots semantically identical after decoding.
+    public var targetDurationSeconds: Int
+    public var actualDurationSeconds: Int
     /// The single source of truth for the weight being performed or most
     /// recently completed. Keeping this beside `actualReps` lets the app and
     /// Live Activity mutate the same progress instead of maintaining separate
@@ -433,9 +492,13 @@ public struct LockScreenState: Codable, Equatable, Sendable {
     public var resumeAt: Date?
     public var phase: LockScreenPhase
 
-    // Derived, so they can never drift out of sync with actualReps.
-    public var canDecrementReps: Bool { actualReps > 0 }
-    public var canIncrementReps: Bool { true }
+    // Derived, so controls can never be enabled for the inactive metric.
+    public var canDecrementReps: Bool { trackingMode == .reps && actualReps > 0 }
+    public var canIncrementReps: Bool { trackingMode == .reps }
+    public var canDecrementDuration: Bool {
+        trackingMode == .duration && actualDurationSeconds > 0
+    }
+    public var canIncrementDuration: Bool { trackingMode == .duration }
 
     public init(
         exerciseName: String,
@@ -448,14 +511,20 @@ public struct LockScreenState: Codable, Equatable, Sendable {
         canCompleteSet: Bool,
         restRemainingSeconds: Int,
         resumeAt: Date?,
-        phase: LockScreenPhase
+        phase: LockScreenPhase,
+        trackingMode: ExerciseTrackingMode = .reps,
+        targetDurationSeconds: Int = 0,
+        actualDurationSeconds: Int = 0
     ) {
         self.exerciseName = exerciseName
         self.exerciseKind = exerciseKind
         self.currentSetIndex = max(1, currentSetIndex)
         self.totalPlannedSets = max(1, totalPlannedSets)
+        self.trackingMode = trackingMode
         self.targetReps = max(0, targetReps)
         self.actualReps = max(0, actualReps)
+        self.targetDurationSeconds = max(0, targetDurationSeconds)
+        self.actualDurationSeconds = max(0, actualDurationSeconds)
         self.storedActualWeight = Self.normalizedWeight(actualWeight, for: exerciseKind)
         self.canCompleteSet = canCompleteSet
         self.restRemainingSeconds = max(0, restRemainingSeconds)
@@ -470,12 +539,15 @@ public struct LockScreenState: Codable, Equatable, Sendable {
             currentSetIndex: setIndex,
             totalPlannedSets: totalSets,
             targetReps: set.targetReps,
-            actualReps: set.targetReps,
+            actualReps: set.trackingMode == .reps ? set.targetReps : 0,
             actualWeight: set.targetWeight,
             canCompleteSet: true,
             restRemainingSeconds: 0,
             resumeAt: nil,
-            phase: .performingSet
+            phase: .performingSet,
+            trackingMode: set.trackingMode,
+            targetDurationSeconds: set.targetDurationSeconds,
+            actualDurationSeconds: set.trackingMode == .duration ? set.targetDurationSeconds : 0
         )
     }
 
@@ -485,7 +557,8 @@ public struct LockScreenState: Codable, Equatable, Sendable {
         totalSets: Int,
         actualReps: Int,
         actualWeight: Double,
-        resumeAt: Date
+        resumeAt: Date,
+        actualDurationSeconds: Int = 0
     ) -> LockScreenState {
         LockScreenState(
             exerciseName: set.exerciseName,
@@ -498,7 +571,10 @@ public struct LockScreenState: Codable, Equatable, Sendable {
             canCompleteSet: false,
             restRemainingSeconds: set.restDurationSeconds,
             resumeAt: resumeAt,
-            phase: .resting
+            phase: .resting,
+            trackingMode: set.trackingMode,
+            targetDurationSeconds: set.targetDurationSeconds,
+            actualDurationSeconds: actualDurationSeconds
         )
     }
 
@@ -507,7 +583,8 @@ public struct LockScreenState: Codable, Equatable, Sendable {
         setIndex: Int,
         totalSets: Int,
         actualReps: Int,
-        actualWeight: Double
+        actualWeight: Double,
+        actualDurationSeconds: Int = 0
     ) -> LockScreenState {
         LockScreenState(
             exerciseName: set.exerciseName,
@@ -520,7 +597,10 @@ public struct LockScreenState: Codable, Equatable, Sendable {
             canCompleteSet: false,
             restRemainingSeconds: 0,
             resumeAt: nil,
-            phase: .completed
+            phase: .completed,
+            trackingMode: set.trackingMode,
+            targetDurationSeconds: set.targetDurationSeconds,
+            actualDurationSeconds: actualDurationSeconds
         )
     }
 
@@ -529,8 +609,11 @@ public struct LockScreenState: Codable, Equatable, Sendable {
         case exerciseKind
         case currentSetIndex
         case totalPlannedSets
+        case trackingMode
         case targetReps
         case actualReps
+        case targetDurationSeconds
+        case actualDurationSeconds
         case actualWeight
         case canCompleteSet
         case restRemainingSeconds
@@ -555,7 +638,10 @@ public struct LockScreenState: Codable, Equatable, Sendable {
             canCompleteSet: try container.decode(Bool.self, forKey: .canCompleteSet),
             restRemainingSeconds: try container.decode(Int.self, forKey: .restRemainingSeconds),
             resumeAt: try container.decodeIfPresent(Date.self, forKey: .resumeAt),
-            phase: try container.decode(LockScreenPhase.self, forKey: .phase)
+            phase: try container.decode(LockScreenPhase.self, forKey: .phase),
+            trackingMode: try container.decodeIfPresent(ExerciseTrackingMode.self, forKey: .trackingMode) ?? .reps,
+            targetDurationSeconds: try container.decodeIfPresent(Int.self, forKey: .targetDurationSeconds) ?? 0,
+            actualDurationSeconds: try container.decodeIfPresent(Int.self, forKey: .actualDurationSeconds) ?? 0
         )
     }
 
@@ -565,8 +651,11 @@ public struct LockScreenState: Codable, Equatable, Sendable {
         try container.encode(exerciseKind, forKey: .exerciseKind)
         try container.encode(currentSetIndex, forKey: .currentSetIndex)
         try container.encode(totalPlannedSets, forKey: .totalPlannedSets)
+        try container.encode(trackingMode, forKey: .trackingMode)
         try container.encode(targetReps, forKey: .targetReps)
         try container.encode(actualReps, forKey: .actualReps)
+        try container.encode(targetDurationSeconds, forKey: .targetDurationSeconds)
+        try container.encode(actualDurationSeconds, forKey: .actualDurationSeconds)
         try container.encode(actualWeight, forKey: .actualWeight)
         try container.encode(canCompleteSet, forKey: .canCompleteSet)
         try container.encode(restRemainingSeconds, forKey: .restRemainingSeconds)
@@ -717,7 +806,11 @@ public struct WorkoutSummary: Identifiable, Codable, Equatable, Sendable {
 
     private static func volume(for completedSets: [CompletedSet]) -> Double {
         completedSets.reduce(0) { volume, set in
-            guard set.exerciseKind == .weighted else { return volume }
+            // Duration-based weighted work (for example, a loaded carry) is
+            // meaningful progress, but it does not have a rep-volume value.
+            guard set.exerciseKind == .weighted, set.trackingMode == .reps else {
+                return volume
+            }
             return volume + (set.actualWeight * Double(set.actualReps))
         }
     }

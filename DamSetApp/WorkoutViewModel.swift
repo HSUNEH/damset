@@ -147,6 +147,17 @@ final class WorkoutViewModel {
         }
     }
 
+    func adjustDuration(_ deltaSeconds: Int) {
+        guard !isBusy, var session = activeSession else { return }
+        do {
+            try engine.adjustActualDuration(session: &session, deltaSeconds: deltaSeconds)
+            activeSession = session
+            sync(session)
+        } catch {
+            errorMessage = String(describing: error)
+        }
+    }
+
     func adjustWeight(_ delta: Double) {
         guard !isBusy, var session = activeSession else { return }
         do {
@@ -161,6 +172,11 @@ final class WorkoutViewModel {
     func setReps(_ value: Int) {
         guard let current = activeSession?.lockScreenState.actualReps else { return }
         adjustReps(max(0, value) - current)
+    }
+
+    func setDuration(_ value: Int) {
+        guard let current = activeSession?.lockScreenState.actualDurationSeconds else { return }
+        adjustDuration(max(0, value) - current)
     }
 
     func setWeight(_ value: Double) {
@@ -274,6 +290,8 @@ final class WorkoutViewModel {
             exerciseKind: planned.exerciseKind,
             targetWeight: planned.targetWeight,
             targetReps: planned.targetReps,
+            trackingMode: planned.trackingMode,
+            targetDurationSeconds: planned.targetDurationSeconds,
             restDurationSeconds: planned.restDurationSeconds
         )
         activeSession = session
@@ -442,7 +460,8 @@ final class WorkoutViewModel {
                 setIndex: zeroBasedIndex + 1,
                 totalSets: finished.plannedSets.count,
                 actualReps: lastCompleted.actualReps,
-                actualWeight: lastCompleted.actualWeight
+                actualWeight: lastCompleted.actualWeight,
+                actualDurationSeconds: lastCompleted.actualDurationSeconds
             )
         } else {
             finished.lockScreenState.phase = .completed

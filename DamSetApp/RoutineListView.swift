@@ -473,11 +473,19 @@ struct WorkoutSummaryDetailView: View {
             }
             Section("Totals") {
                 LabeledContent("Total sets", value: "\(summary.totalSets)")
-                if summary.hasWeightedSets {
+                if summary.hasWeightedRepetitionSets {
                     LabeledContent("Total volume", value: "\(summary.totalVolume.formatted()) kg")
+                }
+                if summary.hasDurationSets {
+                    LabeledContent(
+                        "Timed work",
+                        value: summary.totalRecordedDurationSeconds.minuteSecondText
+                    )
                 }
                 if summary.hasBodyweightSets {
                     LabeledContent("Training", value: "Bodyweight")
+                } else if summary.hasWeightedSets && !summary.hasWeightedRepetitionSets {
+                    LabeledContent("Training", value: "Weighted")
                 }
                 LabeledContent("Started", value: summary.workoutStartTime.formatted(date: .abbreviated, time: .shortened))
                 LabeledContent("Ended", value: summary.workoutEndTime.formatted(date: .abbreviated, time: .shortened))
@@ -543,20 +551,30 @@ struct WorkoutSummaryDetailView: View {
         VStack(alignment: .leading, spacing: 2) {
             Text(set.exerciseName)
                 .foregroundStyle(.primary)
-            Text("Set \(index + 1)")
+            Text(set.trackingMode == .duration ? "Set \(index + 1) · Timed" : "Set \(index + 1)")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
     }
 
     private func completedSetValue(_ set: CompletedSet) -> some View {
-        Text(
-            set.exerciseKind == .bodyweight
-                ? "Bodyweight × \(set.actualReps)"
-                : "\(set.actualWeight.formatted()) kg × \(set.actualReps)"
-        )
+        Text(completedSetValueText(set))
             .monospacedDigit()
             .foregroundStyle(.primary)
+    }
+
+    private func completedSetValueText(_ set: CompletedSet) -> String {
+        switch set.trackingMode {
+        case .reps:
+            return set.exerciseKind == .bodyweight
+                ? "Bodyweight × \(set.actualReps)"
+                : "\(set.actualWeight.formatted()) kg × \(set.actualReps)"
+        case .duration:
+            let load = set.exerciseKind == .bodyweight
+                ? "Bodyweight"
+                : "\(set.actualWeight.formatted()) kg"
+            return "\(load) · \(set.actualDurationSeconds.minuteSecondText)"
+        }
     }
 }
 

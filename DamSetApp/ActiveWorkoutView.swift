@@ -127,7 +127,7 @@ struct ActiveWorkoutView: View {
                 switch session.lockScreenState.phase {
                 case .performingSet:
                     targetCard(session)
-                    repsControl(session)
+                    progressControl(session)
                     if session.lockScreenState.exerciseKind == .weighted {
                         weightCard(session)
                     }
@@ -374,8 +374,11 @@ struct ActiveWorkoutView: View {
         VStack(spacing: 8) {
             SteelBarDivider()
 
-            GymSectionLabel(text: "Target reps", color: DamSetDesign.steel)
-            Text("\(session.lockScreenState.targetReps)")
+            GymSectionLabel(
+                text: session.lockScreenState.trackingMode == .duration ? "Target time" : "Target reps",
+                color: DamSetDesign.steel
+            )
+            Text(targetValue(for: session.lockScreenState))
                 .font(.system(size: min(targetNumberSize, 72), weight: .black, design: .default))
                 .fontWidth(.condensed)
                 .foregroundStyle(.primary)
@@ -400,13 +403,22 @@ struct ActiveWorkoutView: View {
         .gymPanel(cut: 16)
     }
 
-    private func repsControl(_ session: WorkoutRoutineSession) -> some View {
+    private func progressControl(_ session: WorkoutRoutineSession) -> some View {
         VStack(spacing: 14) {
             SteelBarDivider(accent: DamSetDesign.accent)
-            repsEditor(session)
+            progressEditor(session)
         }
         .frame(maxWidth: .infinity)
         .gymPanel(accent: DamSetDesign.accent.opacity(0.78), cut: 16)
+    }
+
+    @ViewBuilder
+    private func progressEditor(_ session: WorkoutRoutineSession) -> some View {
+        if session.lockScreenState.trackingMode == .duration {
+            durationEditor(session)
+        } else {
+            repsEditor(session)
+        }
     }
 
     @ViewBuilder
@@ -439,12 +451,50 @@ struct ActiveWorkoutView: View {
         }
     }
 
+    @ViewBuilder
+    private func durationEditor(_ session: WorkoutRoutineSession) -> some View {
+        if dynamicTypeSize.isAccessibilitySize {
+            VStack(spacing: 14) {
+                durationValue(session)
+                HStack {
+                    durationButton(
+                        symbol: "minus",
+                        label: "Decrease time by 5 seconds",
+                        delta: -5,
+                        disabled: !session.lockScreenState.canDecrementDuration
+                    )
+                    Spacer()
+                    durationButton(
+                        symbol: "plus",
+                        label: "Increase time by 5 seconds",
+                        delta: 5
+                    )
+                }
+            }
+        } else {
+            HStack(spacing: 20) {
+                durationButton(
+                    symbol: "minus",
+                    label: "Decrease time by 5 seconds",
+                    delta: -5,
+                    disabled: !session.lockScreenState.canDecrementDuration
+                )
+                durationValue(session)
+                durationButton(
+                    symbol: "plus",
+                    label: "Increase time by 5 seconds",
+                    delta: 5
+                )
+            }
+        }
+    }
+
     private func restCorrectionPanel(_ session: WorkoutRoutineSession) -> some View {
         VStack(spacing: 16) {
             if dynamicTypeSize.isAccessibilitySize {
                 DisclosureGroup(isExpanded: $showRestCorrection) {
                     VStack(spacing: 18) {
-                        repsEditor(session)
+                        progressEditor(session)
                         if session.lockScreenState.exerciseKind == .weighted {
                             Divider()
                                 .overlay(DamSetDesign.steelMuted.opacity(0.7))
@@ -461,7 +511,7 @@ struct ActiveWorkoutView: View {
             } else {
                 VStack(spacing: 16) {
                     GymSectionLabel(text: "Correct last set")
-                    repsEditor(session)
+                    progressEditor(session)
                     if session.lockScreenState.exerciseKind == .weighted {
                         Divider()
                             .overlay(DamSetDesign.steelMuted.opacity(0.7))
@@ -536,6 +586,46 @@ struct ActiveWorkoutView: View {
     ) -> some View {
         GlassCircleControl(symbol: symbol, label: label) {
             viewModel.adjustReps(delta)
+        }
+        .buttonRepeatBehavior(.enabled)
+        .disabled(disabled || viewModel.isBusy)
+    }
+
+    private func durationValue(_ session: WorkoutRoutineSession) -> some View {
+        Button {
+            beginProgressEntry(
+                .duration,
+                value: session.lockScreenState.actualDurationSeconds.minuteSecondText
+            )
+        } label: {
+            VStack(spacing: 2) {
+                Text(session.lockScreenState.phase == .performingSet ? "Actual time" : "Last set time")
+                    .font(.caption.weight(.semibold))
+                    .textCase(.uppercase)
+                    .tracking(1)
+                    .foregroundStyle(DamSetDesign.accent)
+                Text(session.lockScreenState.actualDurationSeconds.minuteSecondText)
+                    .font(.system(size: min(actualNumberSize, 52), weight: .black, design: .default))
+                    .fontWidth(.condensed)
+                    .foregroundStyle(DamSetDesign.accent)
+                    .monospacedDigit()
+                    .contentTransition(.numericText())
+            }
+            .frame(minWidth: 112)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Actual time, \(session.lockScreenState.actualDurationSeconds) seconds")
+        .accessibilityHint("Enter actual time directly")
+    }
+
+    private func durationButton(
+        symbol: String,
+        label: String,
+        delta: Int,
+        disabled: Bool = false
+    ) -> some View {
+        GlassCircleControl(symbol: symbol, label: label) {
+            viewModel.adjustDuration(delta)
         }
         .buttonRepeatBehavior(.enabled)
         .disabled(disabled || viewModel.isBusy)
@@ -766,12 +856,24 @@ struct ActiveWorkoutView: View {
 
     private func nextSetCaption(for session: WorkoutRoutineSession) -> String {
         guard let next = session.nextPlannedSet else { return "finish" }
+        if next.trackingMode == .duration {
+            let load = next.exerciseKind == .bodyweight
+                ? "bodyweight"
+                : "\(next.targetWeight.formatted()) kg"
+            return "\(load) · \(next.targetDurationSeconds.minuteSecondText)"
+        }
         return next.exerciseKind == .bodyweight
             ? "bodyweight × \(next.targetReps)"
             : "\(next.targetWeight.formatted()) kg × \(next.targetReps)"
     }
 
     private func targetDescription(_ planned: PlannedSet) -> String {
+        if planned.trackingMode == .duration {
+            let load = planned.exerciseKind == .bodyweight
+                ? "Bodyweight"
+                : "\(planned.targetWeight.formatted()) kg"
+            return "\(load) · \(planned.targetDurationSeconds.minuteSecondText) · \(planned.restDurationSeconds.minuteSecondText) rest"
+        }
         let load = planned.exerciseKind == .bodyweight
             ? "Bodyweight × \(planned.targetReps)"
             : "\(planned.targetWeight.formatted()) kg × \(planned.targetReps)"
@@ -779,9 +881,21 @@ struct ActiveWorkoutView: View {
     }
 
     private func completedSetDescription(_ set: CompletedSet) -> String {
-        set.exerciseKind == .bodyweight
+        if set.trackingMode == .duration {
+            let load = set.exerciseKind == .bodyweight
+                ? "bodyweight"
+                : "\(set.actualWeight.formatted()) kg"
+            return "\(load) · \(set.actualDurationSeconds.minuteSecondText)"
+        }
+        return set.exerciseKind == .bodyweight
             ? "bodyweight × \(set.actualReps)"
             : "\(set.actualWeight.formatted()) kg × \(set.actualReps)"
+    }
+
+    private func targetValue(for state: LockScreenState) -> String {
+        state.trackingMode == .duration
+            ? state.targetDurationSeconds.minuteSecondText
+            : "\(state.targetReps)"
     }
 
     private var progressEntryIsPresented: Binding<Bool> {
@@ -806,6 +920,9 @@ struct ActiveWorkoutView: View {
         case .reps:
             guard let value = Int(rawValue), value >= 0 else { return }
             viewModel.setReps(min(value, 999))
+        case .duration:
+            guard let value = parsedDurationSeconds(rawValue) else { return }
+            viewModel.setDuration(value)
         case .weight:
             let normalized = rawValue.replacingOccurrences(of: ",", with: ".")
             guard let value = Double(normalized), value.isFinite, value >= 0 else { return }
@@ -821,6 +938,8 @@ struct ActiveWorkoutView: View {
         switch progressEntryField {
         case .reps:
             return Int(rawValue).map { $0 >= 0 } ?? false
+        case .duration:
+            return parsedDurationSeconds(rawValue) != nil
         case .weight:
             let normalized = rawValue.replacingOccurrences(of: ",", with: ".")
             return Double(normalized).map { $0.isFinite && $0 >= 0 } ?? false
@@ -873,11 +992,13 @@ struct ActiveWorkoutView: View {
 
 private enum ProgressEntryField {
     case reps
+    case duration
     case weight
 
     var title: String {
         switch self {
         case .reps: "Edit reps"
+        case .duration: "Edit time"
         case .weight: "Edit weight"
         }
     }
@@ -885,6 +1006,7 @@ private enum ProgressEntryField {
     var placeholder: String {
         switch self {
         case .reps: "Reps"
+        case .duration: "mm:ss"
         case .weight: "Kilograms"
         }
     }
@@ -892,9 +1014,27 @@ private enum ProgressEntryField {
     var message: String {
         switch self {
         case .reps: "Enter the reps completed."
+        case .duration: "Enter seconds or mm:ss."
         case .weight: "Enter the weight in kilograms."
         }
     }
+}
+
+private func parsedDurationSeconds(_ rawValue: String) -> Int? {
+    let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+    let parts = trimmed.split(separator: ":", omittingEmptySubsequences: false)
+    let seconds: Int?
+    if parts.count == 2,
+       let minutes = Int(parts[0]),
+       let remainder = Int(parts[1]),
+       minutes >= 0,
+       (0...59).contains(remainder) {
+        seconds = minutes * 60 + remainder
+    } else {
+        seconds = Int(trimmed)
+    }
+    guard let seconds else { return nil }
+    return min(86_400, max(0, seconds))
 }
 
 private struct FlowMetricData {

@@ -121,6 +121,66 @@ final class RoutineStoreTests: XCTestCase {
         }
     }
 
+    func testLegacySetSnapshotsDecodeAsRepsWithoutDurationData() throws {
+        let plannedJSON = """
+        {
+          "setId": "legacy-planned",
+          "exerciseName": "Bench Press",
+          "exerciseKind": "weighted",
+          "targetWeight": 60,
+          "targetReps": 8,
+          "restDurationSeconds": 90,
+          "manuallyAdded": false
+        }
+        """
+        let completedJSON = """
+        {
+          "setId": "legacy-completed",
+          "exerciseName": "Bench Press",
+          "exerciseKind": "weighted",
+          "actualWeight": 60,
+          "actualReps": 8,
+          "completedAt": 100
+        }
+        """
+
+        let decoder = JSONDecoder()
+        let planned = try decoder.decode(
+            PlannedSet.self,
+            from: try XCTUnwrap(plannedJSON.data(using: .utf8))
+        )
+        let completed = try decoder.decode(
+            CompletedSet.self,
+            from: try XCTUnwrap(completedJSON.data(using: .utf8))
+        )
+
+        XCTAssertEqual(planned.trackingMode, .reps)
+        XCTAssertEqual(planned.targetDurationSeconds, 0)
+        XCTAssertEqual(completed.trackingMode, .reps)
+        XCTAssertEqual(completed.actualDurationSeconds, 0)
+    }
+
+    func testDurationExercisePlansRoundTripWithoutLosingModeOrTarget() throws {
+        let plan = RoutineExercisePlan(
+            id: "plank",
+            exerciseName: "Plank",
+            exerciseKind: .bodyweight,
+            targetWeight: 0,
+            targetReps: 0,
+            trackingMode: .duration,
+            targetDurationSeconds: 90,
+            setCount: 3,
+            restDurationSeconds: 45
+        )
+
+        let expanded = plan.expandedPlannedSets()
+        XCTAssertEqual(expanded.count, 3)
+        XCTAssertTrue(expanded.allSatisfy { $0.trackingMode == .duration })
+        XCTAssertTrue(expanded.allSatisfy { $0.targetDurationSeconds == 90 })
+        XCTAssertEqual(expanded.groupedExercisePlans().first?.trackingMode, .duration)
+        XCTAssertEqual(expanded.groupedExercisePlans().first?.targetDurationSeconds, 90)
+    }
+
     func testRoutineRestDefaultRoundTripsAlongsideExerciseOverrides() throws {
         try withStore(seedRoutines: []) { store, fileURL in
             let routine = RoutineTemplate(
