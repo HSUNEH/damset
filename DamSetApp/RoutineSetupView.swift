@@ -12,6 +12,9 @@ struct RoutineSetupView: View {
     @State private var exerciseEditor: ExerciseEditorContext?
     @State private var routinePendingChooser: RoutineTemplate?
     @State private var showDeleteConfirmation = false
+#if os(iOS)
+    @State private var listEditMode: EditMode = .inactive
+#endif
 
     init(
         routine: RoutineTemplate,
@@ -42,10 +45,22 @@ struct RoutineSetupView: View {
             Section {
                 exercisesEditor
             } header: {
-                SectionHeader(
-                    title: "Exercises",
-                    subtitle: "Tap a name to edit · drag ≡ to reorder · ← swipe to delete"
-                )
+                HStack(alignment: .top, spacing: 12) {
+                    SectionHeader(
+                        title: "Exercises",
+                        subtitle: exercisesSubtitle
+                    )
+                    Spacer(minLength: 8)
+                    if isReordering {
+                        Button("Done") {
+                            finishReordering()
+                        }
+                        .font(.footnote.weight(.bold))
+                        .buttonStyle(.bordered)
+                        .tint(DamSetDesign.moss)
+                        .accessibilityLabel("Finish reordering exercises")
+                    }
+                }
                 .textCase(nil)
             }
 
@@ -58,7 +73,7 @@ struct RoutineSetupView: View {
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
         #if os(iOS)
-        .environment(\.editMode, .constant(.active))
+        .environment(\.editMode, $listEditMode)
         #endif
         .background(DamSetDesign.screenBackground.ignoresSafeArea())
         .safeAreaInset(edge: .bottom) {
@@ -163,7 +178,10 @@ struct RoutineSetupView: View {
                     CompactExerciseRow(
                         exercise: exercise,
                         order: index + 1,
-                        edit: { presentExerciseEditor(for: exercise) }
+                        canReorder: draftExercises.count > 1,
+                        isReordering: isReordering,
+                        edit: { presentExerciseEditor(for: exercise) },
+                        beginReordering: beginReordering
                     )
                     .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                         Button(role: .destructive) {
@@ -227,6 +245,21 @@ struct RoutineSetupView: View {
             !$0.exerciseName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
             $0.setCount > 0
         }
+    }
+
+    private var exercisesSubtitle: String {
+        if isReordering {
+            return "Drag ≡ to reorder, then tap Done."
+        }
+        return "Tap a name to edit · swipe ← to delete · tap ≡ to reorder"
+    }
+
+    private var isReordering: Bool {
+        #if os(iOS)
+        listEditMode.isEditing
+        #else
+        false
+        #endif
     }
 
     private var totalSetCount: Int {
@@ -315,6 +348,23 @@ struct RoutineSetupView: View {
         }
     }
 
+    private func beginReordering() {
+        #if os(iOS)
+        guard draftExercises.count > 1 else { return }
+        withAnimation(.snappy) {
+            listEditMode = .active
+        }
+        #endif
+    }
+
+    private func finishReordering() {
+        #if os(iOS)
+        withAnimation(.snappy) {
+            listEditMode = .inactive
+        }
+        #endif
+    }
+
     private func delete(_ exercise: EditableExercisePlan) {
         draftExercises.removeAll { $0.id == exercise.id }
     }
@@ -329,27 +379,69 @@ private struct ExerciseEditorContext: Identifiable {
 private struct CompactExerciseRow: View {
     let exercise: EditableExercisePlan
     let order: Int
+    let canReorder: Bool
+    let isReordering: Bool
     let edit: () -> Void
+    let beginReordering: () -> Void
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
-        Button(action: edit) {
-            if dynamicTypeSize.isAccessibilitySize {
-                VStack(alignment: .leading, spacing: 8) {
-                    titleRow
+        HStack(spacing: 8) {
+            if isReordering {
+                rowContent
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                Button(action: edit) {
+                    rowContent
+                }
+                .buttonStyle(.plain)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityLabel("Edit \(exercise.exerciseName)")
+                .accessibilityValue(accessibilitySummary)
+                .accessibilityHint("Double-tap to change this exercise.")
+            }
+
+            if canReorder && !isReordering {
+                Button(action: beginReordering) {
+                    Image(systemName: "line.3.horizontal")
+                        .font(.body.weight(.bold))
+                        .foregroundStyle(DamSetDesign.steel)
+                        .frame(width: 42, height: 42)
+                        .background(DamSetDesign.controlFill, in: RoundedRectangle(cornerRadius: 11))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 11)
+                                .stroke(DamSetDesign.steelMuted, lineWidth: 1)
+                        }
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Reorder exercises")
+                .accessibilityHint("Shows drag handles to change the exercise order.")
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .dynamicTypeSize(...DynamicTypeSize.accessibility2)
+        .cardSurface(cornerRadius: 16)
+    }
+
+    @ViewBuilder
+    private var rowContent: some View {
+        if dynamicTypeSize.isAccessibilitySize {
+            VStack(alignment: .leading, spacing: 8) {
+                titleRow
+                summary
+            }
+        } else {
+            HStack(spacing: 12) {
+                orderBadge
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(exercise.exerciseName)
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
                     summary
                 }
-            } else {
-                HStack(spacing: 12) {
-                    orderBadge
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(exercise.exerciseName)
-                            .font(.headline)
-                            .foregroundStyle(.primary)
-                            .lineLimit(1)
-                        summary
-                    }
-                    Spacer(minLength: 8)
+                Spacer(minLength: 8)
+                if !isReordering {
                     Image(systemName: "pencil")
                         .font(.footnote.weight(.bold))
                         .foregroundStyle(DamSetDesign.steel)
@@ -357,13 +449,6 @@ private struct CompactExerciseRow: View {
                 }
             }
         }
-        .buttonStyle(.plain)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityLabel("Edit \(exercise.exerciseName)")
-        .accessibilityValue(accessibilitySummary)
-        .accessibilityHint("Double-tap to change this exercise. Drag the reorder handle on the right to change its position.")
-        .dynamicTypeSize(...DynamicTypeSize.accessibility2)
-        .cardSurface(cornerRadius: 16)
     }
 
     private var titleRow: some View {
@@ -374,10 +459,12 @@ private struct CompactExerciseRow: View {
                 .foregroundStyle(.primary)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 8)
-            Image(systemName: "pencil")
-                .font(.footnote.weight(.bold))
-                .foregroundStyle(DamSetDesign.steel)
-                .accessibilityHidden(true)
+            if !isReordering {
+                Image(systemName: "pencil")
+                    .font(.footnote.weight(.bold))
+                    .foregroundStyle(DamSetDesign.steel)
+                    .accessibilityHidden(true)
+            }
         }
     }
 
