@@ -54,6 +54,20 @@ sources:
 - 진단 요청은 원인과 근거를 먼저 제시한다. 수정 요청이면 재현 → 최소 수정
   → 회귀 검증까지 수행한다.
 
+## Orca 작업공간의 터미널 제어
+
+`last_verified: 2026-07-19`
+
+- Orca 안의 터미널·분할·에이전트 실행은 데스크톱 UI 자동화보다 `orca` CLI를
+  먼저 쓴다. `orca status --json`이 `runtime.ready`인지 확인한 뒤
+  `orca terminal list --worktree active --json`으로 대상 핸들을 식별한다.
+- 새 Codex 분할은 대상 핸들을 명시해 한 번에 만든다:
+  `orca terminal split --terminal <handle> --direction horizontal --command "codex" --json`.
+  기존 사용자의 패널에 `send`로 입력하지 않는다.
+- 런타임이 준비되지 않았을 때는 UI를 대신 조작하지 않는다. 상태를 다시
+  확인하거나 사용자에게 Orca 연결 상태를 알린다. Computer Use는 Orca 터미널
+  레이아웃이 아닌 별도 데스크톱 앱 작업에만 사용한다.
+
 ## 자주 쓰는 명령
 
 ```bash

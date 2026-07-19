@@ -19,14 +19,24 @@ last_verified: "2026-07-19"
 ## 현재 알려진 환경
 
 - `/Applications/Xcode.app`의 마지막 확인 버전: Xcode 26.6
-- 현재 전역 `xcode-select`는 Command Line Tools를 가리키며 Xcode
-  라이선스가 미동의 상태다. `DEVELOPER_DIR`로 설치본을 선택해도 라이선스
-  동의 전에는 `devicectl`을 사용할 수 없다.
-- iOS 26.3.1/26.5 시뮬레이터에서 앱 빌드·설치·실행 이력이 있다.
+- 현재 전역 `xcode-select`는 Command Line Tools를 가리킨다. Xcode
+  라이선스 동의 뒤에는 `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer`
+  접두사로 Xcode 26.6과 `devicectl`을 사용할 수 있다.
+- iOS 플랫폼은 Xcode Settings의 Components에서 설치한다. 이번 환경에서
+  항목 이름은 `iOS 26.5.1 + iOS 26.5 Simulator`이고 8.49GB를 사용한다.
+  이 Components 패키지는 실기기 지원에도 필요하다. 반면
+  `xcodebuild -downloadPlatform iOS`는 약 7.9GB의 독립 Simulator Runtime을
+  받아 이 문제를 해결하지 않는다.
+- 연결된 iPhone은 `devicectl`에서 `connected`로 확인된다. Xcode 대상
+  목록에 실기기가 즉시 보이지 않아도 generic iOS 빌드 뒤
+  `devicectl device install app`과 `process launch`로 설치·실행할 수 있다.
 - 연결된 iPhone은 iPhone Mirroring에서 DamSet 실행과 화면 캡처가
   확인됐다. 실기기 UI를 읽을 때 현재 가장 빠른 관찰 채널이다.
 - 무료 개발 팀으로 앱과 Live Activity 확장을 서명하기 위해 App Group
   entitlement를 제거한 상태다.
+- 자동 프로비저닝에는 Xcode Settings의 Accounts에 Apple 개발 계정이
+  등록돼 있어야 한다. generic iOS 빌드에는
+  `-allowProvisioningUpdates -allowProvisioningDeviceRegistration`을 쓴다.
 - 스토어는 App Group을 사용할 수 없으면 앱 로컬 컨테이너로 폴백한다.
 - 무료 팀 프로파일은 짧게 만료되므로 실기기 설치 전 재서명이 필요할 수 있다.
 
@@ -91,6 +101,11 @@ DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild -version
   켜고 재부팅한다.
 - DDI/OS 지원 오류: Xcode와 기기 OS 지원 범위를 확인하고 기기를 잠금
   해제한 뒤 다시 마운트한다.
+- `iOS <version> is not installed`: Xcode Settings의 Components에서 기기
+  OS용 iOS 플랫폼을 설치한다. Components 항목에 Simulator가 함께 표시될 수
+  있지만 실기기 지원 패키지이므로 제거하지 않는다. 반면
+  `xcodebuild -downloadPlatform iOS`로 받은 독립 Simulator Runtime만
+  `xcrun simctl runtime list`에서 비중복인지 식별한 뒤 제거한다.
 - App Group capability 오류: 현재 무료 팀 결정과 `project.yml`을 확인한다.
   임의로 entitlement를 되살리지 않는다.
 - remote launch `Locked`: 기기를 잠금 해제한다.
