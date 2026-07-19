@@ -233,14 +233,9 @@ struct DamSetLiveActivityWidget: Widget {
                 // entire Live Activity inside the Lock Screen height budget;
                 // the rest countdown moves into the Skip action instead.
                 controlsRow(context: context)
-                    .invalidatableContent()
             } else {
                 statusLine(context: context)
                 controlsRow(context: context)
-                    // WidgetKit renders this as pending while the App Intent
-                    // saves and refreshes the Activity, instead of looking as
-                    // if a tap was ignored.
-                    .invalidatableContent()
             }
         }
         .padding(.horizontal, 16)
@@ -432,17 +427,22 @@ struct DamSetLiveActivityWidget: Widget {
     /// Label the editable number so a just-finished set on the Rest screen is
     /// still unambiguously the actual rep count, rather than the set target.
     private func actualRepsMetric(context: ActivityViewContext<DamSetActivityAttributes>) -> some View {
-        VStack(spacing: 1) {
+        let actualReps = displayedActualReps(for: context)
+        return VStack(spacing: 1) {
             Text(showsAutomaticNextSet(context) ? "TARGET REPS" : "ACTUAL REPS")
                 .font(.system(size: 8, weight: .bold, design: .rounded))
                 .tracking(0.35)
                 .foregroundStyle(TrainingPalette.secondary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.72)
-            Text("\(displayedActualReps(for: context))")
+            Text("\(actualReps)")
                 .font(.system(size: 25, weight: .bold, design: .rounded))
                 .monospacedDigit()
-                .contentTransition(.numericText())
+                // Supplying the value lets SwiftUI infer whether this tap was
+                // + or −, giving each digit the expected slot-style motion
+                // instead of fading/replacing the entire card.
+                .contentTransition(.numericText(value: Double(actualReps)))
+                .animation(.snappy(duration: 0.22), value: actualReps)
                 .foregroundStyle(TrainingPalette.primary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.72)

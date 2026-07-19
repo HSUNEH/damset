@@ -82,6 +82,9 @@ struct AdjustRepsIntent: LiveActivityIntent {
     static let title: LocalizedStringResource = "Adjust Reps"
     static let isDiscoverable = false
     static let authenticationPolicy: IntentAuthenticationPolicy = .alwaysAllowed
+    // Repetition taps never need a foreground scene. Keeping them in the
+    // background avoids an unnecessary process/UI handoff on the Lock Screen.
+    static let supportedModes: IntentModes = .background
 
     @Parameter(title: "Session ID") var sessionId: String
     @Parameter(title: "Delta") var delta: Int
@@ -109,6 +112,7 @@ struct AdjustDurationIntent: LiveActivityIntent {
     static let title: LocalizedStringResource = "Adjust Time"
     static let isDiscoverable = false
     static let authenticationPolicy: IntentAuthenticationPolicy = .alwaysAllowed
+    static let supportedModes: IntentModes = .background
 
     @Parameter(title: "Session ID") var sessionId: String
     @Parameter(title: "Seconds") var deltaSeconds: Int
@@ -136,6 +140,7 @@ struct AdjustWeightIntent: LiveActivityIntent {
     static let title: LocalizedStringResource = "Adjust Weight"
     static let isDiscoverable = false
     static let authenticationPolicy: IntentAuthenticationPolicy = .alwaysAllowed
+    static let supportedModes: IntentModes = .background
 
     @Parameter(title: "Session ID") var sessionId: String
     @Parameter(title: "Kilograms") var delta: Double
