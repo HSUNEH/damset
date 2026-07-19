@@ -227,12 +227,6 @@ struct DamSetLiveActivityWidget: Widget {
                     .font(.headline)
                     .foregroundStyle(TrainingPalette.completed)
                     .frame(maxWidth: .infinity, minHeight: 42)
-            } else if displayedExerciseKind(for: context) == ExerciseKind.weighted.rawValue {
-                // Weighted sets use a second compact 44pt control row for
-                // actual load. Omitting the separate status line keeps the
-                // entire Live Activity inside the Lock Screen height budget;
-                // the rest countdown moves into the Skip action instead.
-                controlsRow(context: context)
             } else {
                 statusLine(context: context)
                 controlsRow(context: context)
@@ -311,39 +305,16 @@ struct DamSetLiveActivityWidget: Widget {
         .frame(minHeight: 18)
     }
 
-    /// The first row adjusts reps/time and completes the set. Weighted work
-    /// gets a second row for −2.5 kg / actual kg / +2.5 kg so every button
-    /// remains at least 44pt instead of crowding seven controls into one row.
-    /// During an active rest, corrections apply to the set that just finished.
+    /// Keep reps, kilograms, and the completion action in one balanced row.
+    /// Each adjustment button remains 44pt, while the two number columns use
+    /// the same typography and directional number transition.
     private func controlsRow(context: ActivityViewContext<DamSetActivityAttributes>) -> some View {
-        VStack(spacing: 6) {
-            HStack(spacing: 9) {
-                progressAdjustmentControls(context: context)
-                primaryAction(context: context)
-            }
+        HStack(alignment: .bottom, spacing: 8) {
+            progressAdjustmentControls(context: context)
             if displayedExerciseKind(for: context) == ExerciseKind.weighted.rawValue {
-                HStack(spacing: 9) {
-                    Button(intent: AdjustWeightIntent(
-                        sessionId: context.attributes.sessionId,
-                        delta: -2.5
-                    )) {
-                        progressControlIcon("minus")
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Decrease weight by 2.5 kilograms")
-
-                    actualWeightMetric(context: context)
-
-                    Button(intent: AdjustWeightIntent(
-                        sessionId: context.attributes.sessionId,
-                        delta: 2.5
-                    )) {
-                        progressControlIcon("plus")
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Increase weight by 2.5 kilograms")
-                }
+                weightAdjustmentControls(context: context)
             }
+            primaryAction(context: context)
         }
     }
 
@@ -354,7 +325,7 @@ struct DamSetLiveActivityWidget: Widget {
                 Label("Done", systemImage: "checkmark")
                     .font(.headline.weight(.bold))
                     .foregroundStyle(.white)
-                    .frame(minWidth: 82, maxWidth: .infinity, minHeight: 44)
+                    .frame(minWidth: 72, maxWidth: .infinity, minHeight: 44)
                     .background(TrainingPalette.accent, in: Capsule())
             }
             .buttonStyle(.plain)
@@ -375,7 +346,7 @@ struct DamSetLiveActivityWidget: Widget {
                 }
                 .font(.headline.weight(.bold))
                 .foregroundStyle(.white)
-                .frame(minWidth: 82, maxWidth: .infinity, minHeight: 44)
+                .frame(minWidth: 72, maxWidth: .infinity, minHeight: 44)
                 .background(TrainingPalette.accent, in: Capsule())
             }
             .buttonStyle(.plain)
@@ -385,6 +356,15 @@ struct DamSetLiveActivityWidget: Widget {
 
     @ViewBuilder
     private func progressAdjustmentControls(context: ActivityViewContext<DamSetActivityAttributes>) -> some View {
+        VStack(spacing: 2) {
+            Text(progressMetricTitle(context: context))
+                .font(.system(size: 8, weight: .bold, design: .rounded))
+                .tracking(0.35)
+                .foregroundStyle(TrainingPalette.secondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+
+            HStack(spacing: 0) {
         if isDurationTracked(context) {
             Button(intent: AdjustDurationIntent(sessionId: context.attributes.sessionId, deltaSeconds: -5)) {
                 progressControlIcon("minus")
@@ -414,6 +394,52 @@ struct DamSetLiveActivityWidget: Widget {
             .buttonStyle(.plain)
             .accessibilityLabel("Increase reps")
         }
+            }
+        }
+        .frame(width: 124)
+        .accessibilityElement(children: .contain)
+    }
+
+    private func progressMetricTitle(context: ActivityViewContext<DamSetActivityAttributes>) -> String {
+        if showsAutomaticNextSet(context) {
+            return isDurationTracked(context) ? "TARGET TIME" : "TARGET REPS"
+        }
+        return isDurationTracked(context) ? "ACTUAL TIME" : "ACTUAL REPS"
+    }
+
+    private func weightAdjustmentControls(context: ActivityViewContext<DamSetActivityAttributes>) -> some View {
+        VStack(spacing: 2) {
+            Text(showsAutomaticNextSet(context) ? "TARGET KG" : "ACTUAL KG")
+                .font(.system(size: 8, weight: .bold, design: .rounded))
+                .tracking(0.35)
+                .foregroundStyle(TrainingPalette.secondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+
+            HStack(spacing: 0) {
+                Button(intent: AdjustWeightIntent(
+                    sessionId: context.attributes.sessionId,
+                    delta: -1
+                )) {
+                    progressControlIcon("minus")
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Decrease weight by 1 kilogram")
+
+                actualWeightMetric(context: context)
+
+                Button(intent: AdjustWeightIntent(
+                    sessionId: context.attributes.sessionId,
+                    delta: 1
+                )) {
+                    progressControlIcon("plus")
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Increase weight by 1 kilogram")
+            }
+        }
+        .frame(width: 124)
+        .accessibilityElement(children: .contain)
     }
 
     private func progressControlIcon(_ systemName: String) -> some View {
@@ -424,80 +450,40 @@ struct DamSetLiveActivityWidget: Widget {
             .background(TrainingPalette.control, in: Circle())
     }
 
-    /// Label the editable number so a just-finished set on the Rest screen is
-    /// still unambiguously the actual rep count, rather than the set target.
     private func actualRepsMetric(context: ActivityViewContext<DamSetActivityAttributes>) -> some View {
         let actualReps = displayedActualReps(for: context)
-        return VStack(spacing: 1) {
-            Text(showsAutomaticNextSet(context) ? "TARGET REPS" : "ACTUAL REPS")
-                .font(.system(size: 8, weight: .bold, design: .rounded))
-                .tracking(0.35)
-                .foregroundStyle(TrainingPalette.secondary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.72)
-            Text("\(actualReps)")
-                .font(.system(size: 25, weight: .bold, design: .rounded))
-                .monospacedDigit()
-                // Supplying the value lets SwiftUI infer whether this tap was
-                // + or −, giving each digit the expected slot-style motion
-                // instead of fading/replacing the entire card.
-                .contentTransition(.numericText(value: Double(actualReps)))
-                .animation(.snappy(duration: 0.22), value: actualReps)
-                .foregroundStyle(TrainingPalette.primary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.72)
-        }
-        .frame(width: 52, height: 44)
+        return rollingNumber("\(actualReps)", value: Double(actualReps))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(showsAutomaticNextSet(context) ? "Target reps" : "Actual reps")
-        .accessibilityValue("\(displayedActualReps(for: context))")
+        .accessibilityValue("\(actualReps)")
     }
 
     private func actualDurationMetric(context: ActivityViewContext<DamSetActivityAttributes>) -> some View {
-        VStack(spacing: 1) {
-            Text(showsAutomaticNextSet(context) ? "TARGET TIME" : "ACTUAL TIME")
-                .font(.system(size: 8, weight: .bold, design: .rounded))
-                .tracking(0.35)
-                .foregroundStyle(TrainingPalette.secondary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.72)
-            Text(durationText(displayedActualDuration(for: context)))
-                .font(.system(size: 21, weight: .bold, design: .rounded))
-                .monospacedDigit()
-                .contentTransition(.numericText())
-                .foregroundStyle(TrainingPalette.primary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.72)
-        }
-        .frame(width: 64, height: 44)
+        let duration = displayedActualDuration(for: context)
+        return rollingNumber(durationText(duration), value: Double(duration))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(showsAutomaticNextSet(context) ? "Target time" : "Actual time")
-        .accessibilityValue("\(displayedActualDuration(for: context)) seconds")
+        .accessibilityValue("\(duration) seconds")
     }
 
-    /// At the instant the resting card becomes the next-set card, this changes
-    /// to Target so it never claims an unperformed set already has an actual
-    /// weight. The surrounding −/+ buttons make it actual on the first edit.
     private func actualWeightMetric(context: ActivityViewContext<DamSetActivityAttributes>) -> some View {
-        VStack(spacing: 1) {
-            Text(showsAutomaticNextSet(context) ? "TARGET KG" : "ACTUAL KG")
-                .font(.system(size: 8, weight: .bold, design: .rounded))
-                .tracking(0.35)
-                .foregroundStyle(TrainingPalette.secondary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.75)
-            Text(displayedWeight(for: context).formatted())
-                .font(.system(size: 18, weight: .bold, design: .rounded))
-                .monospacedDigit()
-                .foregroundStyle(TrainingPalette.primary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.72)
-        }
-        .frame(maxWidth: .infinity, minHeight: 44, maxHeight: 44)
-        .background(TrainingPalette.control, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        let weight = displayedWeight(for: context)
+        return rollingNumber(weight.formatted(), value: weight)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(showsAutomaticNextSet(context) ? "Target weight" : "Actual weight")
-        .accessibilityValue("\(displayedWeight(for: context).formatted()) kilograms")
+        .accessibilityValue("\(weight.formatted()) kilograms")
+    }
+
+    private func rollingNumber(_ text: String, value: Double) -> some View {
+        Text(text)
+            .font(.system(size: 25, weight: .bold, design: .rounded))
+            .monospacedDigit()
+            .contentTransition(.numericText(value: value))
+            .animation(.snappy(duration: 0.22), value: value)
+            .foregroundStyle(TrainingPalette.primary)
+            .lineLimit(1)
+            .minimumScaleFactor(0.55)
+            .frame(width: 36, height: 44)
     }
 
     private func loadSummary(for context: ActivityViewContext<DamSetActivityAttributes>) -> String {

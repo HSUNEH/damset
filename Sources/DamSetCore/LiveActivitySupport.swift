@@ -168,6 +168,73 @@ public enum WorkoutSessionSync {
             staleDate: staleDate
         )
     }
+
+    /// iOS 26 can start an Activity at an exact future date, even when DamSet
+    /// is locked. Use that system-owned transition for the next set instead of
+    /// hoping a widget timeline wakes the app at the end of rest.
+    private static func scheduledNextSetContent(
+        for session: WorkoutRoutineSession,
+        nextSet: PlannedSet
+    ) -> ActivityContent<DamSetActivityAttributes.ContentState> {
+        let nextState = LockScreenState.performing(
+            nextSet,
+            setIndex: session.currentSetIndex + 1,
+            totalSets: session.plannedSets.count
+        )
+        return ActivityContent(
+            state: DamSetActivityAttributes.ContentState(nextState),
+            staleDate: nil
+        )
+    }
+
+    /// Returns `true` only when the system accepted (or already holds) the
+    /// scheduled next-set card. The caller can then safely retire the resting
+    /// card at the same deadline without needing a server or AlarmKit.
+    private static func scheduleNextSetActivityIfPossible(
+        for session: WorkoutRoutineSession
+    ) -> Bool {
+        guard session.sessionStatus == .resting,
+              let resumeAt = session.lockScreenState.resumeAt,
+              resumeAt > Date.now,
+              let nextSet = session.nextPlannedSet,
+              ActivityAuthorizationInfo().areActivitiesEnabled else {
+            return false
+        }
+
+        if Activity<DamSetActivityAttributes>.activities.contains(where: {
+            $0.attributes.sessionId == session.sessionId && $0.activityState == .pending
+        }) {
+            return true
+        }
+
+        let attributes = DamSetActivityAttributes(
+            sessionId: session.sessionId,
+            routineName: session.routineName
+        )
+        let alert = AlertConfiguration(
+            title: "Next set",
+            body: "Start now",
+            sound: .named(RestCueScheduler.startSoundFileName)
+        )
+
+        do {
+            _ = try Activity.request(
+                attributes: attributes,
+                content: scheduledNextSetContent(for: session, nextSet: nextSet),
+                pushType: nil,
+                style: .standard,
+                alertConfiguration: alert,
+                start: resumeAt
+            )
+            // A scheduled Activity owns the precise end cue. Keeping the
+            // older local-notification countdown would play a second, delayed
+            // sequence after the next card has already appeared.
+            RestCueScheduler.cancelPendingCues()
+            return true
+        } catch {
+            return false
+        }
+    }
     #endif
 
     /// Starts the Live Activity for a session, or adopts an existing one after
@@ -176,6 +243,12 @@ public enum WorkoutSessionSync {
         #if os(iOS) && canImport(ActivityKit)
         guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
         let content = activityContent(for: session)
+        if session.sessionStatus == .resting,
+           Activity<DamSetActivityAttributes>.activities.contains(where: {
+               $0.attributes.sessionId == session.sessionId && $0.activityState == .pending
+           }) {
+            return
+        }
         if let existing = Activity<DamSetActivityAttributes>.activities.first(where: {
             $0.attributes.sessionId == session.sessionId
                 && ($0.activityState == .active || $0.activityState == .stale)
@@ -193,6 +266,18 @@ public enum WorkoutSessionSync {
     public static func updateLiveActivity(for session: WorkoutRoutineSession) async {
         #if os(iOS) && canImport(ActivityKit)
         let content = activityContent(for: session)
+        if session.sessionStatus == .resting,
+           scheduleNextSetActivityIfPossible(for: session),
+           let resumeAt = session.lockScreenState.resumeAt {
+            for activity in Activity<DamSetActivityAttributes>.activities where
+                activity.attributes.sessionId == session.sessionId
+                    && (activity.activityState == .active || activity.activityState == .stale) {
+                // The resting card remains visible and counts down until the
+                // scheduled next-set card takes its place at `resumeAt`.
+                await activity.end(content, dismissalPolicy: .after(resumeAt))
+            }
+            return
+        }
         for activity in Activity<DamSetActivityAttributes>.activities where activity.attributes.sessionId == session.sessionId {
             if session.sessionStatus == .completed || session.sessionStatus == .cancelled {
                 await activity.end(content, dismissalPolicy: .immediate)
