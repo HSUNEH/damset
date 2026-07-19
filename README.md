@@ -24,6 +24,8 @@
   <a href="./docs/qa-automation.md">QA 가이드</a>
   ·
   <a href="./docs/design-notes.md">디자인 노트</a>
+  ·
+  <a href="./wiki/index.md">에이전트 위키</a>
 </p>
 
 > [!NOTE]
