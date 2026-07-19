@@ -678,11 +678,11 @@ private struct EditableExerciseCard: View {
             .accessibilityHint("Choose repetitions or a timed hold for each set")
 
             if dynamicTypeSize.isAccessibilitySize {
-                if !exercise.usesPerSetDetails {
-                    if exercise.exerciseKind == .weighted {
-                        weightField
-                        Divider().overlay(DamSetDesign.steelMuted)
-                    }
+                if exercise.exerciseKind == .weighted, !exercise.usesDetailedWeight {
+                    weightField
+                    Divider().overlay(DamSetDesign.steelMuted)
+                }
+                if !exercise.usesDetailedProgress {
                     goalField
                     Divider().overlay(DamSetDesign.steelMuted)
                 }
@@ -697,10 +697,10 @@ private struct EditableExerciseCard: View {
                     ],
                     spacing: 16
                 ) {
-                    if !exercise.usesPerSetDetails {
-                        if exercise.exerciseKind == .weighted {
-                            weightField
-                        }
+                    if exercise.exerciseKind == .weighted, !exercise.usesDetailedWeight {
+                        weightField
+                    }
+                    if !exercise.usesDetailedProgress {
                         goalField
                     }
                     setsField
@@ -710,17 +710,38 @@ private struct EditableExerciseCard: View {
 
             Divider().overlay(DamSetDesign.steelMuted)
 
-            Toggle(isOn: perSetDetailsBinding) {
+            Text("세트별 상세 설정")
+                .font(.subheadline.weight(.bold))
+                .foregroundStyle(.primary)
+
+            if exercise.exerciseKind == .weighted {
+                Toggle(isOn: detailedWeightBinding) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("상세 무게")
+                            .font(.subheadline.weight(.semibold))
+                        Text("세트마다 다른 무게를 설정합니다")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .tint(DamSetDesign.accent)
+            }
+
+            Toggle(isOn: detailedProgressBinding) {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("Set-specific targets")
+                    Text(exercise.trackingMode == .duration ? "상세 시간" : "상세 횟수")
                         .font(.subheadline.weight(.semibold))
-                    Text("Set a different \(perSetTargetDescription) for each set")
+                    Text(
+                        exercise.trackingMode == .duration
+                            ? "세트마다 다른 시간을 설정합니다"
+                            : "세트마다 다른 횟수를 설정합니다"
+                    )
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
             }
             .tint(DamSetDesign.accent)
-            .accessibilityHint("Shows separate target controls for every set")
+            .accessibilityHint("선택한 항목을 세트별로 설정합니다")
 
             if exercise.usesPerSetDetails {
                 VStack(spacing: 12) {
@@ -729,7 +750,9 @@ private struct EditableExerciseCard: View {
                             setNumber: index + 1,
                             detail: $exercise.setDetails[index],
                             exerciseKind: exercise.exerciseKind,
-                            trackingMode: exercise.trackingMode
+                            trackingMode: exercise.trackingMode,
+                            showsWeight: exercise.usesDetailedWeight,
+                            showsProgress: exercise.usesDetailedProgress
                         )
                     }
                 }
@@ -740,28 +763,26 @@ private struct EditableExerciseCard: View {
         .cardSurface(cornerRadius: 20)
     }
 
-    private var perSetDetailsBinding: Binding<Bool> {
+    private var detailedWeightBinding: Binding<Bool> {
         Binding(
-            get: { exercise.usesPerSetDetails },
+            get: { exercise.usesDetailedWeight },
             set: { enabled in
                 withAnimation(.snappy) {
-                    exercise.setPerSetDetailsEnabled(enabled)
+                    exercise.setDetailedWeightEnabled(enabled)
                 }
             }
         )
     }
 
-    private var perSetTargetDescription: String {
-        switch (exercise.exerciseKind, exercise.trackingMode) {
-        case (.weighted, .reps):
-            return "weight and reps"
-        case (.weighted, .duration):
-            return "weight and duration"
-        case (.bodyweight, .reps):
-            return "rep count"
-        case (.bodyweight, .duration):
-            return "duration"
-        }
+    private var detailedProgressBinding: Binding<Bool> {
+        Binding(
+            get: { exercise.usesDetailedProgress },
+            set: { enabled in
+                withAnimation(.snappy) {
+                    exercise.setDetailedProgressEnabled(enabled)
+                }
+            }
+        )
     }
 
     private var weightField: some View {
@@ -873,6 +894,8 @@ private struct SetTargetEditor: View {
     @Binding var detail: EditableSetTarget
     let exerciseKind: ExerciseKind
     let trackingMode: ExerciseTrackingMode
+    let showsWeight: Bool
+    let showsProgress: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -895,7 +918,7 @@ private struct SetTargetEditor: View {
                 ],
                 spacing: 12
             ) {
-                if exerciseKind == .weighted {
+                if exerciseKind == .weighted, showsWeight {
                     StepperField(
                         title: "Weight (kg)",
                         value: detail.targetWeight.formatted(
@@ -914,7 +937,7 @@ private struct SetTargetEditor: View {
                     )
                 }
 
-                if trackingMode == .duration {
+                if trackingMode == .duration, showsProgress {
                     StepperField(
                         title: "Duration / set",
                         value: detail.targetDurationSeconds.minuteSecondText,
@@ -935,7 +958,7 @@ private struct SetTargetEditor: View {
                             detail.targetDurationSeconds = seconds
                         }
                     )
-                } else {
+                } else if showsProgress {
                     StepperField(
                         title: "Reps / set",
                         value: "\(detail.targetReps)",
@@ -1127,10 +1150,20 @@ private struct StepperField: View {
 private struct EditableExercisePlan: Identifiable, Equatable {
     var plan: RoutineExercisePlan
     var setDetails: [EditableSetTarget]
-    var usesPerSetDetails: Bool
+    var usesDetailedWeight: Bool
+    var usesDetailedReps: Bool
+    var usesDetailedDuration: Bool
     private var lastWeightedTargetWeight: Double
 
     var id: String { plan.id }
+
+    var usesDetailedProgress: Bool {
+        trackingMode == .duration ? usesDetailedDuration : usesDetailedReps
+    }
+
+    var usesPerSetDetails: Bool {
+        (exerciseKind == .weighted && usesDetailedWeight) || usesDetailedProgress
+    }
 
     var exerciseName: String {
         get { plan.exerciseName }
@@ -1220,14 +1253,18 @@ private struct EditableExercisePlan: Identifiable, Equatable {
         )
         self.plan = newPlan
         self.setDetails = newPlan.expandedPlannedSets().map(EditableSetTarget.init)
-        self.usesPerSetDetails = false
+        self.usesDetailedWeight = false
+        self.usesDetailedReps = false
+        self.usesDetailedDuration = false
         self.lastWeightedTargetWeight = exerciseKind == .weighted ? normalizedWeight : 20
     }
 
     init(plan: RoutineExercisePlan) {
         self.plan = plan
         self.setDetails = plan.expandedPlannedSets().map(EditableSetTarget.init)
-        self.usesPerSetDetails = false
+        self.usesDetailedWeight = false
+        self.usesDetailedReps = false
+        self.usesDetailedDuration = false
         self.lastWeightedTargetWeight = plan.exerciseKind == .weighted ? plan.targetWeight : 20
     }
 
@@ -1246,10 +1283,14 @@ private struct EditableExercisePlan: Identifiable, Equatable {
             manuallyAdded: first.manuallyAdded
         )
         self.setDetails = plannedSets.map(EditableSetTarget.init)
-        self.usesPerSetDetails = plannedSets.dropFirst().contains {
+        self.usesDetailedWeight = plannedSets.dropFirst().contains {
             $0.targetWeight != first.targetWeight
-                || $0.targetReps != first.targetReps
-                || $0.targetDurationSeconds != first.targetDurationSeconds
+        }
+        self.usesDetailedReps = plannedSets.dropFirst().contains {
+            $0.targetReps != first.targetReps
+        }
+        self.usesDetailedDuration = plannedSets.dropFirst().contains {
+            $0.targetDurationSeconds != first.targetDurationSeconds
         }
         self.lastWeightedTargetWeight = first.exerciseKind == .weighted
             ? first.targetWeight
@@ -1274,17 +1315,37 @@ private struct EditableExercisePlan: Identifiable, Equatable {
         return groups.map(EditableExercisePlan.init(plannedSets:))
     }
 
-    mutating func setPerSetDetailsEnabled(_ enabled: Bool) {
-        guard enabled != usesPerSetDetails else { return }
+    mutating func setDetailedWeightEnabled(_ enabled: Bool) {
+        guard enabled != usesDetailedWeight else { return }
         if enabled {
             ensureSetDetailCapacity()
             for index in 0..<setCount {
                 setDetails[index].targetWeight = targetWeight
-                setDetails[index].targetReps = targetReps
-                setDetails[index].targetDurationSeconds = targetDurationSeconds
             }
         }
-        usesPerSetDetails = enabled
+        usesDetailedWeight = enabled
+    }
+
+    mutating func setDetailedProgressEnabled(_ enabled: Bool) {
+        if trackingMode == .duration {
+            guard enabled != usesDetailedDuration else { return }
+            if enabled {
+                ensureSetDetailCapacity()
+                for index in 0..<setCount {
+                    setDetails[index].targetDurationSeconds = targetDurationSeconds
+                }
+            }
+            usesDetailedDuration = enabled
+        } else {
+            guard enabled != usesDetailedReps else { return }
+            if enabled {
+                ensureSetDetailCapacity()
+                for index in 0..<setCount {
+                    setDetails[index].targetReps = targetReps
+                }
+            }
+            usesDetailedReps = enabled
+        }
     }
 
     func expandedPlannedSets() -> [PlannedSet] {
@@ -1301,10 +1362,10 @@ private struct EditableExercisePlan: Identifiable, Equatable {
                 setId: detail.setId,
                 exerciseName: exerciseName,
                 exerciseKind: exerciseKind,
-                targetWeight: usesPerSetDetails ? detail.targetWeight : targetWeight,
-                targetReps: usesPerSetDetails ? detail.targetReps : targetReps,
+                targetWeight: usesDetailedWeight ? detail.targetWeight : targetWeight,
+                targetReps: usesDetailedReps ? detail.targetReps : targetReps,
                 trackingMode: trackingMode,
-                targetDurationSeconds: usesPerSetDetails
+                targetDurationSeconds: usesDetailedDuration
                     ? detail.targetDurationSeconds
                     : targetDurationSeconds,
                 restDurationSeconds: restSeconds,
@@ -1340,7 +1401,9 @@ private struct EditableExercisePlan: Identifiable, Equatable {
             manuallyAdded: true
         )
         copy.lastWeightedTargetWeight = lastWeightedTargetWeight
-        copy.usesPerSetDetails = usesPerSetDetails
+        copy.usesDetailedWeight = usesDetailedWeight
+        copy.usesDetailedReps = usesDetailedReps
+        copy.usesDetailedDuration = usesDetailedDuration
         if usesPerSetDetails {
             for index in 0..<setCount {
                 copy.setDetails[index].targetWeight = setDetails[index].targetWeight
