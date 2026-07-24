@@ -154,6 +154,19 @@ struct WorkoutLaunchView: View {
                     .font(.footnote.weight(.semibold))
                     .foregroundStyle(DamSetDesign.amber)
                     .transition(.opacity)
+            } else {
+                Label(
+                    "Est. \(estimatedDurationSeconds.compactDurationText) incl. rest",
+                    systemImage: "timer"
+                )
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
+                .contentTransition(.numericText())
+                .transition(.opacity)
+                .accessibilityLabel(
+                    "Estimated workout time \(estimatedDurationSeconds.compactDurationText), including rest"
+                )
             }
 
             Button(action: startSelectedWorkout) {
@@ -177,7 +190,7 @@ struct WorkoutLaunchView: View {
                 .fill(DamSetDesign.steelMuted.opacity(0.55))
                 .frame(height: 0.5)
         }
-        .animation(.easeOut(duration: 0.16), value: selectedExerciseNames.isEmpty)
+        .animation(.easeOut(duration: 0.16), value: selectedExerciseNames)
     }
 
     private var exerciseGroups: [ExerciseGroup] {
@@ -198,6 +211,10 @@ struct WorkoutLaunchView: View {
 
     private var selectedSetCount: Int {
         selectedRoutine.plannedSets.count
+    }
+
+    private var estimatedDurationSeconds: Int {
+        WorkoutDurationEstimate.estimatedSeconds(for: selectedRoutine.plannedSets)
     }
 
     private var selectionSummary: String {

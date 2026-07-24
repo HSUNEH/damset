@@ -1,7 +1,7 @@
 ---
 type: product
 status: active
-updated: "2026-07-19"
+updated: "2026-07-24"
 tags: [product, ux, workout]
 sources:
   - README.md
@@ -62,6 +62,11 @@ DamSet은 iOS 26+ iPhone에서 루틴 선택부터 실제 세트 기록, 휴식,
   시스템 사운드가 허용된 폴백이다.
 - 완료 이력에는 실제로 완료한 세트만 들어가며 사용자는 이후 값을 수정하거나
   기록을 삭제할 수 있다.
+- 운동 선택 화면은 선택 토글에 따라 갱신되는 예상 소요시간을 보여 준다.
+  세트당 작업 30초(시간 기반 세트는 목표 시간)로 가정하고, 엔진이 마지막
+  세트 뒤 휴식 없이 완료하므로 마지막 세트의 휴식은 합산하지 않는다
+  (`Sources/DamSetCore/WorkoutDurationEstimate.swift`).
+- 완료 화면과 기록 상세는 시작–종료 시각과 실제 총 소요시간을 보여 준다.
 
 ## 현재 범위
 

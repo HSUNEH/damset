@@ -783,6 +783,12 @@ public struct WorkoutSummary: Identifiable, Codable, Equatable, Sendable {
 
     public var id: String { sessionId }
 
+    /// Wall-clock workout length. Hand-edited records can place the end
+    /// before the start; clamp instead of reporting a negative duration.
+    public var elapsedSeconds: Int {
+        max(0, Int(workoutEndTime.timeIntervalSince(workoutStartTime).rounded()))
+    }
+
     public init(session: WorkoutRoutineSession, endedAt: Date) {
         self.sessionId = session.sessionId
         self.routineId = session.routineId

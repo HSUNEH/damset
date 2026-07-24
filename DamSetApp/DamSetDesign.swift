@@ -382,6 +382,22 @@ extension Int {
     var minuteSecondText: String {
         String(format: "%02d:%02d", self / 60, self % 60)
     }
+
+    /// Seconds rendered as a compact spoken-style duration, e.g. 45 →
+    /// "45 sec", 270 → "4 min 30 sec", 3900 → "1 hr 5 min". Hour-scale
+    /// values drop seconds; that precision is noise at that magnitude.
+    var compactDurationText: String {
+        let hours = self / 3600
+        let minutes = (self % 3600) / 60
+        let seconds = self % 60
+        if hours > 0 {
+            return minutes == 0 ? "\(hours) hr" : "\(hours) hr \(minutes) min"
+        }
+        if minutes > 0 {
+            return seconds == 0 ? "\(minutes) min" : "\(minutes) min \(seconds) sec"
+        }
+        return "\(seconds) sec"
+    }
 }
 
 extension WorkoutSummary {
@@ -418,6 +434,13 @@ extension WorkoutSummary {
     var timedWorkText: String? {
         guard hasDurationSets else { return nil }
         return "\(totalRecordedDurationSeconds.minuteSecondText) timed"
+    }
+
+    /// The workout's start and end as clock times, e.g. "2:14 PM – 2:46 PM".
+    var workoutTimeRangeText: String {
+        let start = workoutStartTime.formatted(date: .omitted, time: .shortened)
+        let end = workoutEndTime.formatted(date: .omitted, time: .shortened)
+        return "\(start) – \(end)"
     }
 
     /// A zero-kilogram weighted set is still weighted training. Derive this

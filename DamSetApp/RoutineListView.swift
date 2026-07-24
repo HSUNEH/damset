@@ -487,6 +487,7 @@ struct WorkoutSummaryDetailView: View {
                 } else if summary.hasWeightedSets && !summary.hasWeightedRepetitionSets {
                     LabeledContent("Training", value: "Weighted")
                 }
+                LabeledContent("Duration", value: summary.elapsedSeconds.compactDurationText)
                 LabeledContent("Started", value: summary.workoutStartTime.formatted(date: .abbreviated, time: .shortened))
                 LabeledContent("Ended", value: summary.workoutEndTime.formatted(date: .abbreviated, time: .shortened))
             }

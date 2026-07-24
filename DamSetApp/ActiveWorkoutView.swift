@@ -1029,6 +1029,16 @@ struct ActiveWorkoutView: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .monospacedDigit()
+                Label(
+                    "\(summary.workoutTimeRangeText) · \(summary.elapsedSeconds.compactDurationText)",
+                    systemImage: "clock"
+                )
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
+                .accessibilityLabel(
+                    "Workout lasted \(summary.elapsedSeconds.compactDurationText), from \(summary.workoutTimeRangeText)"
+                )
             }
             undoSetButton
             Button { viewModel.closeWorkout() } label: {
